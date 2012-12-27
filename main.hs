@@ -3,34 +3,34 @@ import Graphics.UI.Gtk.Builder
 
 import Gramophone.Database as DB
 
-data Widgets = Widgets {
+data GUI = GUI {
       mainWindow :: Window,
       createDatabaseButton :: Button,
       openDatabaseButton :: Button,
       importFilesButton :: Button }
 
-initializeWidgets :: IO Widgets
+initializeWidgets :: IO GUI
 initializeWidgets = do
   builder <-  builderNew
   builderAddFromFile builder "MainWindow.glade"
      
-  wMainWindow <- builderGetObject builder castToWindow "mainWindow"
-  onDestroy wMainWindow mainQuit
+  guiMainWindow <- builderGetObject builder castToWindow "mainWindow"
+  onDestroy guiMainWindow mainQuit
      
-  wStatusLabel <- builderGetObject builder castToLabel "statusLabel"
+  guiStatusLabel <- builderGetObject builder castToLabel "statusLabel"
 
-  wCreateDatabaseButton <- builderGetObject builder castToButton "createDatabaseButton"
+  guiCreateDatabaseButton <- builderGetObject builder castToButton "createDatabaseButton"
 
-  wOpenDatabaseButton <- builderGetObject builder castToButton "openDatabaseButton"
-  wImportFilesButton <- builderGetObject builder castToButton "createDatabaseButton"
+  guiOpenDatabaseButton <- builderGetObject builder castToButton "openDatabaseButton"
+  guiImportFilesButton <- builderGetObject builder castToButton "createDatabaseButton"
 
-  return (Widgets wMainWindow wCreateDatabaseButton wOpenDatabaseButton wImportFilesButton)
+  return (GUI guiMainWindow guiCreateDatabaseButton guiOpenDatabaseButton guiImportFilesButton)
 
 
-onCreateDatabaseButtonClicked :: Widgets -> IO ()
-onCreateDatabaseButtonClicked widgets = do
+onCreateDatabaseButtonClicked :: GUI -> IO ()
+onCreateDatabaseButtonClicked gui = do
   dl <- fileChooserDialogNew (Just "Save Database As...")
-                             (Just (mainWindow widgets))
+                             (Just (mainWindow gui))
                              FileChooserActionSave
                              [("Save", ResponseOk), ("Cancel", ResponseCancel)]
   r <- dialogRun dl
@@ -38,25 +38,25 @@ onCreateDatabaseButtonClicked widgets = do
   case r of
     ResponseOk -> do Just filePath <- fileChooserGetFilename dl
                      db <- DB.createNewDatabase filePath
-                     setDatabase widgets db
+                     setDatabase gui db
     otherwise  -> return ()
   widgetDestroy dl
 
 
-onImportFilesButtonClicked :: Widgets -> DB.Connection -> IO ()
-onImportFilesButtonClicked widgets db = return ()
+onImportFilesButtonClicked :: GUI -> DB.Connection -> IO ()
+onImportFilesButtonClicked gui db = return ()
 
-setDatabase :: Widgets -> DB.Connection -> IO ()
-setDatabase widgets db = do
-  onClicked (importFilesButton widgets) (onImportFilesButtonClicked widgets db)
+setDatabase :: GUI -> DB.Connection -> IO ()
+setDatabase gui db = do
+  onClicked (importFilesButton gui) (onImportFilesButtonClicked gui db)
   return ()
 
 main = do
      initGUI
      
-     widgets <- initializeWidgets
+     gui <- initializeWidgets
 
-     onClicked (createDatabaseButton widgets) (onCreateDatabaseButtonClicked widgets) 
+     onClicked (createDatabaseButton gui) (onCreateDatabaseButtonClicked gui) 
 
-     widgetShowAll (mainWindow widgets)
+     widgetShowAll (mainWindow gui)
      mainGUI
