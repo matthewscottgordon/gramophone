@@ -38,9 +38,18 @@ onCreateDatabaseButtonClicked widgets = do
   case r of
     ResponseOk -> do Just filePath <- fileChooserGetFilename dl
                      db <- DB.createNewDatabase filePath
-                     return ()
+                     setDatabase widgets db
     otherwise  -> return ()
   widgetDestroy dl
+
+
+onImportFilesButtonClicked :: Widgets -> DB.Connection -> IO ()
+onImportFilesButtonClicked widgets db = return ()
+
+setDatabase :: Widgets -> DB.Connection -> IO ()
+setDatabase widgets db = do
+  onClicked (importFilesButton widgets) (onImportFilesButtonClicked widgets db)
+  return ()
 
 main = do
      initGUI
