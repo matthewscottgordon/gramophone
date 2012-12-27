@@ -3,36 +3,51 @@ import Graphics.UI.Gtk.Builder
 
 import Gramophone.Database as DB
 
+data Widgets = Widgets {
+      mainWindow :: Window,
+      createDatabaseButton :: Button,
+      openDatabaseButton :: Button,
+      importFilesButton :: Button }
+
+initializeWidgets :: IO Widgets
+initializeWidgets = do
+  builder <-  builderNew
+  builderAddFromFile builder "MainWindow.glade"
+     
+  wMainWindow <- builderGetObject builder castToWindow "mainWindow"
+  onDestroy wMainWindow mainQuit
+     
+  wStatusLabel <- builderGetObject builder castToLabel "statusLabel"
+
+  wCreateDatabaseButton <- builderGetObject builder castToButton "createDatabaseButton"
+
+  wOpenDatabaseButton <- builderGetObject builder castToButton "openDatabaseButton"
+  wImportFilesButton <- builderGetObject builder castToButton "createDatabaseButton"
+
+  return (Widgets wMainWindow wCreateDatabaseButton wOpenDatabaseButton wImportFilesButton)
+
+
+onCreateDatabaseButtonClicked :: Widgets -> IO ()
+onCreateDatabaseButtonClicked widgets = do
+  dl <- fileChooserDialogNew (Just "Save Database As...")
+                             (Just (mainWindow widgets))
+                             FileChooserActionSave
+                             [("Save", ResponseOk), ("Cancel", ResponseCancel)]
+  r <- dialogRun dl
+  widgetHideAll dl
+  case r of
+    ResponseOk -> do Just filePath <- fileChooserGetFilename dl
+                     db <- DB.createNewDatabase filePath
+                     return ()
+    otherwise  -> return ()
+  widgetDestroy dl
+
 main = do
      initGUI
      
-     builder <- builderNew
-     builderAddFromFile builder "MainWindow.glade"
-     
-     mainWindow <- builderGetObject builder castToWindow "mainWindow"
-     onDestroy mainWindow mainQuit
-     
-     statusLabel <- builderGetObject builder castToLabel "statusLabel"
+     widgets <- initializeWidgets
 
-     createDatabaseButton <- builderGetObject builder castToButton "createDatabaseButton"
-     onClicked createDatabaseButton $ do
-         dl <- fileChooserDialogNew (Just "Save Database As...")
-                                    (Just mainWindow)
-                                    FileChooserActionSave
-                                    [("Save", ResponseOk), ("Cancel", ResponseCancel)]
-         r <- dialogRun dl
-         widgetHideAll dl
-         case r of
-           ResponseOk -> do maybeFilePath <- fileChooserGetFilename dl
-                            case maybeFilePath of
-                              Just filePath -> do DB.createNewDatabase filePath
-                                                  return ()
-                              Nothing       -> return ()
-           otherwise  -> return ()
-         widgetDestroy dl
+     onClicked (createDatabaseButton widgets) (onCreateDatabaseButtonClicked widgets) 
 
-     --onClicked displayMessageButton $ do
-     --    set statusLabel [ labelText := "Button Clicked" ]
-
-     widgetShowAll mainWindow
+     widgetShowAll (mainWindow widgets)
      mainGUI
