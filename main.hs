@@ -2,6 +2,7 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.Builder
 
 import Gramophone.Database as DB
+import Gramophone.MediaController as MC
 
 data GUI = GUI {
       mainWindow :: Window,
