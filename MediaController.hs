@@ -45,10 +45,11 @@ onNewPadConnectToSink sink pad = do
 
 readTagsFromFile :: FilePath -> IO (Maybe Tags)
 readTagsFromFile filePath = do
-  pipe <- GS.pipelineNew filePath
+  let fileUri = "file://" ++ filePath
+  pipe <- GS.pipelineNew fileUri
 
   Just dec <- GS.elementFactoryMake "uridecodebin" Nothing
-  GLib.objectSetPropertyString "uri" dec filePath
+  GLib.objectSetPropertyString "uri" dec fileUri
   _ <- GS.binAdd (GS.castToBin pipe) dec
 
   Just sink <- GS.elementFactoryMake "fakesink" Nothing
