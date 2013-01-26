@@ -62,13 +62,15 @@ readTagsFromFile filePath = do
   bus<- GS.elementGetBus pipe
   eitherTags <- getTags bus
 
-  case eitherTags of
-    Right tags   -> printTags tags
-    Left message -> putStrLn ("Error: " ++ message)
-
   _ <- GS.elementSetState pipe GS.StateNull
 
-  return Nothing
+  case eitherTags of
+    Right tags   -> do
+                    printTags tags
+                    return (Just tags)
+    Left message -> do
+                    putStrLn ("Error: " ++ message)
+                    return Nothing
 
 
 getTags :: GS.Bus -> IO (Either String Tags)
