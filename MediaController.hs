@@ -1,16 +1,14 @@
 module Gramophone.MediaController
     (
-     MediaController(),
      Tags(..),
      initMediaController,
      readTagsFromFile
     ) where
 
 import qualified Media.Streaming.GStreamer as GS
+import qualified System.Glib.GError as GLib
 import qualified System.Glib.Properties as GLib
 import qualified System.Glib.Signals as GLib
-
-data MediaController = MediaController
 
 data Tags = Tags {
       tagTrackName :: Maybe String,
@@ -31,34 +29,19 @@ onNewPadConnectToSink sink pad = do
       q <- GS.padIsLinked pad
       if not q 
       then do
-        GS.padLink pad sinkpad
+        padLinkResult <- GS.padLink pad sinkpad
+        case padLinkResult of
+          GS.PadLinkWrongHierarchy -> putStrLn "Error: PadLinkWrongHierarchy"
+          GS.PadLinkWasLinked      -> putStrLn "Error: PadLinkWasLinked"
+          GS.PadLinkWrongDirection -> putStrLn "Error: PadLinkWrongDirection"
+          GS.PadLinkNoformat       -> putStrLn "Error: PadLinkNoformat"
+          GS.PadLinkNosched        -> putStrLn "Error: PadLinkNosched"
+          GS.PadLinkRefused        -> putStrLn "Error: PadLinkRefused"
+          GS.PadLinkOk             -> return ()
         return ()
       else return ()
     Nothing -> return ()
 
-printTags tagList = do
-  case (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle)) of
-    Just title -> putStrLn title
-    Nothing    -> return ()
-
-whileLoop pipe =
-    loop 
-    where
-      loop = do
-        bus <- GS.elementGetBus pipe
-        maybeMessage <- GS.busTimedPop bus Nothing
-        case maybeMessage of
-          Just message -> case (GS.messageType message) of
-                            GS.MessageAsyncDone -> putStrLn "Done"
-                            GS.MessageError     -> putStrLn "Error"
-                            GS.MessageTag       -> do
-                              case (GS.messageParseTag message) of
-                                Just tagList -> printTags tagList
-                                Nothing      -> return ()
-                              loop
-                            otherwise -> loop
-          Nothing -> return ()
-  
 
 readTagsFromFile :: FilePath -> IO (Maybe Tags)
 readTagsFromFile filePath = do
@@ -66,19 +49,46 @@ readTagsFromFile filePath = do
 
   Just dec <- GS.elementFactoryMake "uridecodebin" Nothing
   GLib.objectSetPropertyString "uri" dec filePath
-  GS.binAdd (GS.castToBin pipe) dec
+  _ <- GS.binAdd (GS.castToBin pipe) dec
 
   Just sink <- GS.elementFactoryMake "fakesink" Nothing
-  GS.binAdd (GS.castToBin pipe) sink
+  _ <- GS.binAdd (GS.castToBin pipe) sink
 
-  GLib.on dec GS.elementPadAdded $ onNewPadConnectToSink sink
+  _ <- GLib.on dec GS.elementPadAdded $ onNewPadConnectToSink sink
 
-  GS.elementSetState pipe GS.StatePaused
+  _ <- GS.elementSetState pipe GS.StatePaused
 
   whileLoop pipe
 
-  GS.elementSetState pipe GS.StateNull
+  _ <- GS.elementSetState pipe GS.StateNull
 
   return Nothing
   
+  where
+    whileLoop pipe =
+        loop 
+        where
+          loop = do
+            bus <- GS.elementGetBus pipe
+            maybeMessage <- GS.busTimedPop bus Nothing
+            case maybeMessage of
+              Just message -> case (GS.messageType message) of
+                                GS.MessageAsyncDone -> return ()
+                                GS.MessageError     -> case GS.messageParseError message of
+                                                         Just ( (GLib.GError _ _ errorMessage), errorString) ->
+                                                                putStrLn ("Error: " ++ errorMessage ++ ": " ++ errorString)
+                                                         Nothing ->
+                                                                putStrLn "Uknown Error"
+                                GS.MessageTag       -> do
+                                  case (GS.messageParseTag message) of
+                                    Just tagList -> printTags tagList
+                                    Nothing      -> return ()
+                                  loop
+                                _                   -> loop
+              Nothing -> return ()
+
+          printTags tagList = do
+                              case (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle)) of
+                                Just title -> putStrLn title
+                                Nothing    -> return ()
       
