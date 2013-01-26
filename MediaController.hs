@@ -59,37 +59,51 @@ readTagsFromFile filePath = do
 
   _ <- GS.elementSetState pipe GS.StatePaused
 
-  whileLoop pipe
+  bus<- GS.elementGetBus pipe
+  eitherTags <- getTags bus
+
+  case eitherTags of
+    Right tags   -> printTags tags
+    Left message -> putStrLn ("Error: " ++ message)
 
   _ <- GS.elementSetState pipe GS.StateNull
 
   return Nothing
-  
-  where
-    whileLoop pipe =
-        loop 
-        where
-          loop = do
-            bus <- GS.elementGetBus pipe
-            maybeMessage <- GS.busTimedPop bus Nothing
-            case maybeMessage of
-              Just message -> case (GS.messageType message) of
-                                GS.MessageAsyncDone -> return ()
-                                GS.MessageError     -> case GS.messageParseError message of
-                                                         Just ( (GLib.GError _ _ errorMessage), errorString) ->
-                                                                putStrLn ("Error: " ++ errorMessage ++ ": " ++ errorString)
-                                                         Nothing ->
-                                                                putStrLn "Uknown Error"
-                                GS.MessageTag       -> do
-                                  case (GS.messageParseTag message) of
-                                    Just tagList -> printTags tagList
-                                    Nothing      -> return ()
-                                  loop
-                                _                   -> loop
-              Nothing -> return ()
 
-          printTags tagList = do
-                              case (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle)) of
-                                Just title -> putStrLn title
-                                Nothing    -> return ()
-      
+
+getTags :: GS.Bus -> IO (Either String Tags)
+getTags bus = loop (Tags Nothing Nothing Nothing Nothing)
+  where
+    loop :: Tags -> IO (Either String Tags)
+    loop tags = do
+        maybeMessage <- GS.busTimedPop bus Nothing
+        case maybeMessage of
+          Just message -> case (GS.messageType message) of
+                            GS.MessageAsyncDone -> return (Right tags)
+                            GS.MessageError     -> case GS.messageParseError message of
+                                                     Just ( (GLib.GError _ _ errorMessage), errorString) ->
+                                                         return (Left ("Error: " ++ errorMessage ++ ": " ++ errorString) )
+                                                     Nothing ->
+                                                         return (Left "Uknown Error")
+                            GS.MessageTag       -> do
+                              case (GS.messageParseTag message) of
+                                Just tagList -> loop (parseTags tags tagList)
+                                Nothing      -> return (Right tags)
+                            _                   -> loop tags
+          Nothing -> return (Right tags)
+
+    parseTags tags tagList = do
+                case (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle)) of
+                  Just title -> tags { tagTrackName = Just title }
+                  Nothing    -> tags
+
+
+printTags :: Tags -> IO ()
+printTags (Tags maybeTrackName maybeArtistName maybeTrackNumber maybeNumberOfTracks) = do
+  printMaybe "Title:       " maybeTrackName
+  printMaybe "Artist:      " maybeArtistName
+  printMaybe "Track #:     " maybeTrackNumber
+  printMaybe "Track Count: " maybeNumberOfTracks
+  where
+    printMaybe label (Just value) = putStrLn ( label ++ (show value) )
+    printMaybe label Nothing      = return ()
