@@ -2,3 +2,5 @@ gramophone
 *~
 *.o
 *.hi
+\#*\#
+.\#*
