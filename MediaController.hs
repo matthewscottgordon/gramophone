@@ -2,7 +2,8 @@ module Gramophone.MediaController
     (
      Tags(..),
      initMediaController,
-     readTagsFromFile
+     readTagsFromFile,
+     printTags
     ) where
 
 import qualified Media.Streaming.GStreamer as GS
