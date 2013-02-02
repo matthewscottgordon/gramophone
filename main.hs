@@ -76,6 +76,7 @@ setDatabase gui db = do
 
 main = do
      initGUI
+     MC.initMediaController
      
      gui <- initializeWidgets
 
