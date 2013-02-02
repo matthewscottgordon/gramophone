@@ -66,7 +66,7 @@ printTags filenames =
     forM_ filenames $ \filename -> do
         maybeTags <- MC.readTagsFromFile filename
         case maybeTags of
-          Just tags -> putStr ( filename ++ ":\n" ++ (show tags) ++ "\n\n")
+          Just tags -> putStrLn ( filename ++ ":\n" ++ (show tags))
           Nothing -> putStrLn ( "No tags for \"" ++ filename ++ "\"" )
 
 setDatabase :: GUI -> DB.Connection -> IO ()
