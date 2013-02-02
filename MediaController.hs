@@ -3,7 +3,6 @@ module Gramophone.MediaController
      Tags(..),
      initMediaController,
      readTagsFromFile,
-     printTags
     ) where
 
 import qualified Media.Streaming.GStreamer as GS
@@ -16,6 +15,16 @@ data Tags = Tags {
       tagArtistName :: Maybe String,
       tagTrackNumber :: Maybe Integer,
       tagNumTracks :: Maybe Integer }
+
+instance Show Tags where
+    show (Tags maybeTrackName maybeArtistName maybeTrackNumber maybeNumberOfTracks) =
+                     (maybeLine "Title:       " maybeTrackName) ++ 
+                     (maybeLine "Artist:      " maybeArtistName) ++
+                     (maybeLine "Track #:     " maybeTrackNumber) ++
+                     (maybeLine "Track Count: " maybeNumberOfTracks)
+                   where
+                     maybeLine label (Just value) = label ++ (show value) ++ "\n"
+                     maybeLine label Nothing      = ""
 
 initMediaController :: IO ()
 initMediaController = do
@@ -99,12 +108,3 @@ getTags bus = loop (Tags Nothing Nothing Nothing Nothing)
                   Nothing    -> tags
 
 
-printTags :: Tags -> IO ()
-printTags (Tags maybeTrackName maybeArtistName maybeTrackNumber maybeNumberOfTracks) = do
-  printMaybe "Title:       " maybeTrackName
-  printMaybe "Artist:      " maybeArtistName
-  printMaybe "Track #:     " maybeTrackNumber
-  printMaybe "Track Count: " maybeNumberOfTracks
-  where
-    printMaybe label (Just value) = putStrLn ( label ++ (show value) )
-    printMaybe label Nothing      = return ()
