@@ -66,9 +66,7 @@ readTagsFromFile filePath = do
   _ <- GS.elementSetState pipe GS.StateNull
 
   case eitherTags of
-    Right tags   -> do
-                    printTags tags
-                    return (Just tags)
+    Right tags   -> return (Just tags)
     Left message -> do
                     putStrLn ("Error: " ++ message)
                     return Nothing
