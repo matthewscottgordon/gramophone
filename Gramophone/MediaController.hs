@@ -38,18 +38,17 @@ onNewPadConnectToSink sink pad = do
     Just sinkpad -> do
       q <- GS.padIsLinked pad
       if not q 
-      then do
-        padLinkResult <- GS.padLink pad sinkpad
-        case padLinkResult of
-          GS.PadLinkWrongHierarchy -> putStrLn "Error: PadLinkWrongHierarchy"
-          GS.PadLinkWasLinked      -> putStrLn "Error: PadLinkWasLinked"
-          GS.PadLinkWrongDirection -> putStrLn "Error: PadLinkWrongDirection"
-          GS.PadLinkNoformat       -> putStrLn "Error: PadLinkNoformat"
-          GS.PadLinkNosched        -> putStrLn "Error: PadLinkNosched"
-          GS.PadLinkRefused        -> putStrLn "Error: PadLinkRefused"
-          GS.PadLinkOk             -> return ()
-        return ()
-      else return ()
+        then do
+          padLinkResult <- GS.padLink pad sinkpad
+          case padLinkResult of
+            GS.PadLinkWrongHierarchy -> putStrLn "Error: PadLinkWrongHierarchy"
+            GS.PadLinkWasLinked      -> putStrLn "Error: PadLinkWasLinked"
+            GS.PadLinkWrongDirection -> putStrLn "Error: PadLinkWrongDirection"
+            GS.PadLinkNoformat       -> putStrLn "Error: PadLinkNoformat"
+            GS.PadLinkNosched        -> putStrLn "Error: PadLinkNosched"
+            GS.PadLinkRefused        -> putStrLn "Error: PadLinkRefused"
+            GS.PadLinkOk             -> return ()
+        else return ()
     Nothing -> return ()
 
 

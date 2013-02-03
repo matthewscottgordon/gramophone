@@ -1,4 +1,6 @@
 gramophone
+cabal-dev
+dist
 *~
 *.o
 *.hi
