@@ -5,6 +5,8 @@ module Gramophone.MediaController
      readTagsFromFile,
     ) where
 
+import Control.Applicative ((<$>))
+
 import qualified Media.Streaming.GStreamer as GS
 import qualified System.Glib.GError as GLib
 import qualified System.Glib.Properties as GLib
@@ -12,16 +14,23 @@ import qualified System.Glib.Signals as GLib
 
 data Tags = Tags {
       tagTrackName :: Maybe String,
+      tagAlbumName :: Maybe String,
       tagArtistName :: Maybe String,
       tagTrackNumber :: Maybe Integer,
-      tagNumTracks :: Maybe Integer }
+      tagNumTracks :: Maybe Integer,
+      tagDiscNumber :: Maybe Integer,
+      tagNumDiscs :: Maybe Integer
+}
 
 instance Show Tags where
-    show (Tags maybeTrackName maybeArtistName maybeTrackNumber maybeNumberOfTracks) =
+    show (Tags maybeTrackName maybeAlbumName maybeArtistName maybeTrackNumber maybeNumTracks maybeDiscNumber maybeNumDiscs) =
                      (maybeLine "Title:       " maybeTrackName) ++ 
                      (maybeLine "Artist:      " maybeArtistName) ++
+                     (maybeLine "Album:       " maybeAlbumName) ++
                      (maybeLine "Track #:     " maybeTrackNumber) ++
-                     (maybeLine "Track Count: " maybeNumberOfTracks)
+                     (maybeLine "Track Count: " maybeNumTracks) ++
+                     (maybeLine "Disc #:      " maybeDiscNumber) ++
+                     (maybeLine "Disc Count:  " maybeNumDiscs)
                    where
                      maybeLine label (Just value) = label ++ (show value) ++ "\n"
                      maybeLine label Nothing      = ""
@@ -79,9 +88,8 @@ readTagsFromFile filePath = do
                     putStrLn ("Error: " ++ message)
                     return Nothing
 
-
 getTags :: GS.Bus -> IO (Either String Tags)
-getTags bus = loop (Tags Nothing Nothing Nothing Nothing)
+getTags bus = loop (Tags Nothing Nothing Nothing Nothing Nothing Nothing Nothing)
   where
     loop :: Tags -> IO (Either String Tags)
     loop tags = do
@@ -101,9 +109,13 @@ getTags bus = loop (Tags Nothing Nothing Nothing Nothing)
                             _                   -> loop tags
           Nothing -> return (Right tags)
 
-    parseTags tags tagList = do
-                case (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle)) of
-                  Just title -> tags { tagTrackName = Just title }
-                  Nothing    -> tags
+    parseTags tags tagList =
+        tags { tagTrackName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle) }
+             { tagAlbumName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagAlbum) }
+             { tagArtistName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagArtist) }
+             { tagTrackNumber = read <$> GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTrackNumber) }
+             { tagNumTracks = read <$> GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTrackCount) }
+             { tagDiscNumber = read <$> GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagAlbumVolumeNumber) }
+             { tagNumDiscs = read <$> GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagVolumeCount) }
 
 
