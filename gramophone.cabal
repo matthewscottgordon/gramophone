@@ -17,4 +17,4 @@ cabal-version:       >=1.8
 executable gramophone
   main-is:             main.hs       
   other-modules:       Gramophone.Database, Gramophone.MediaController
-  build-depends:       base ==4.5.*, gstreamer ==0.12.*, glib ==0.12.*, gtk ==0.12.*, HDBC, HDBC-sqlite3
+  build-depends:       base ==4.5.*, gstreamer ==0.12.*, glib ==0.12.*, gtk ==0.12.*, HDBC, HDBC-sqlite3, directory

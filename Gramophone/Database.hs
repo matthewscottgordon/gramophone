@@ -3,7 +3,7 @@ module Gramophone.Database
      Connection(),
      openDatabase,
      closeDatabase,
-     createNewDatabase
+     openOrCreateDatabase
     ) where
 
 import Database.HDBC.Sqlite3 (connectSqlite3)
@@ -11,6 +11,8 @@ import qualified Database.HDBC.Sqlite3 (Connection)
 import Database.HDBC
 
 import Control.Monad
+
+import System.Directory (doesFileExist)
 
 
 data Connection = Connection Database.HDBC.Sqlite3.Connection
@@ -21,6 +23,16 @@ openDatabase = return . Connection <=< connectSqlite3
 
 closeDatabase :: Connection -> IO ()
 closeDatabase (Connection conn) = disconnect conn
+
+
+openOrCreateDatabase :: String -> IO Connection
+openOrCreateDatabase filename = do
+  fileExists <- doesFileExist filename
+  if fileExists
+    then
+      openDatabase filename
+    else
+      createNewDatabase filename
 
 
 createNewDatabase :: String -> IO Connection
