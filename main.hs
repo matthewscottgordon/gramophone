@@ -6,10 +6,10 @@ import qualified Gramophone.MediaController as MC
 
 import Control.Monad (forM_)
 
+import System.Directory (createDirectoryIfMissing,getHomeDirectory)
+
 data GUI = GUI {
       mainWindow :: Window,
-      createDatabaseButton :: Button,
-      openDatabaseButton :: Button,
       importFilesButton :: Button }
 
 initializeWidgets :: IO GUI
@@ -22,28 +22,9 @@ initializeWidgets = do
      
   guiStatusLabel <- builderGetObject builder castToLabel "statusLabel"
 
-  guiCreateDatabaseButton <- builderGetObject builder castToButton "createDatabaseButton"
-
-  guiOpenDatabaseButton <- builderGetObject builder castToButton "openDatabaseButton"
   guiImportFilesButton <- builderGetObject builder castToButton "importFilesButton"
 
-  return (GUI guiMainWindow guiCreateDatabaseButton guiOpenDatabaseButton guiImportFilesButton)
-
-
-onCreateDatabaseButtonClicked :: GUI -> IO ()
-onCreateDatabaseButtonClicked gui = do
-  dl <- fileChooserDialogNew (Just "Save Database As...")
-                             (Just (mainWindow gui))
-                             FileChooserActionSave
-                             [("Save", ResponseOk), ("Cancel", ResponseCancel)]
-  r <- dialogRun dl
-  widgetHideAll dl
-  case r of
-    ResponseOk -> do Just filePath <- fileChooserGetFilename dl
-                     db <- DB.createNewDatabase filePath
-                     setDatabase gui db
-    otherwise  -> return ()
-  widgetDestroy dl
+  return (GUI guiMainWindow guiImportFilesButton)
 
 
 onImportFilesButtonClicked :: GUI -> DB.Connection -> IO ()
@@ -74,13 +55,25 @@ setDatabase gui db = do
   onClicked (importFilesButton gui) (onImportFilesButtonClicked gui db) 
   return ()
 
+getDataDirectory :: IO String
+getDataDirectory = do
+  homeDir <- getHomeDirectory
+  let dataDir = homeDir ++ "/.gramophone"
+  createDirectoryIfMissing False dataDir
+  return dataDir
+
+openDatabase :: IO DB.Connection
+openDatabase = do
+  dataDir <- getDataDirectory
+  DB.openOrCreateDatabase ( dataDir ++ "/database" )
+
 main = do
      initGUI
      MC.initMediaController
      
      gui <- initializeWidgets
-
-     onClicked (createDatabaseButton gui) (onCreateDatabaseButtonClicked gui) 
+     db <- openDatabase
+     setDatabase gui db
 
      widgetShowAll (mainWindow gui)
      mainGUI
