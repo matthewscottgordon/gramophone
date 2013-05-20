@@ -113,9 +113,9 @@ getTags bus = loop (Tags Nothing Nothing Nothing Nothing Nothing Nothing Nothing
         tags { tagTrackName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle) }
              { tagAlbumName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagAlbum) }
              { tagArtistName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagArtist) }
-             { tagTrackNumber = read <$> GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTrackNumber) }
-             { tagNumTracks = read <$> GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTrackCount) }
-             { tagDiscNumber = read <$> GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagAlbumVolumeNumber) }
-             { tagNumDiscs = read <$> GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagVolumeCount) }
+             { tagTrackNumber = fromIntegral <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagTrackNumber) }
+             { tagNumTracks = fromIntegral <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagTrackCount) }
+             { tagDiscNumber = fromIntegral <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagAlbumVolumeNumber)}
+             { tagNumDiscs = fromIntegral <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagVolumeCount) }
 
 
