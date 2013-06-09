@@ -13,6 +13,7 @@ import qualified System.FilePath as FilePath
 import System.Directory(getDirectoryContents,doesDirectoryExist)
 import System.IO.Error(isDoesNotExistError,isPermissionError)
 import Control.Exception(try)
+import Data.List(sort)
 
 
 printTags :: [String] -> IO ()
@@ -79,7 +80,7 @@ getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
       [whamlet|
                 <body>
                   <h1>#{path}
-                  $forall dir <- subDirs
+                  $forall dir <- sort subDirs
                     <li><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}
                   <a href=@{TestR}>Back to testing functions|]
 
