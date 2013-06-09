@@ -8,6 +8,12 @@ import Control.Monad (forM_)
 import System.Directory (createDirectoryIfMissing,getHomeDirectory)
 import Yesod
 
+import qualified Data.Text as T
+import qualified System.FilePath as FilePath
+import System.Directory(getDirectoryContents)
+import System.IO.Error(isDoesNotExistError,isPermissionError)
+import Control.Exception(try)
+
 
 printTags :: [String] -> IO ()
 printTags filenames =
@@ -30,11 +36,24 @@ openDatabase = do
   DB.openOrCreateDatabase ( dataDir ++ "/database" )
 
 
+data RawFilePath = RawFilePath FilePath.FilePath
+                   deriving(Show, Eq, Read)
+
+
+instance PathMultiPiece RawFilePath where
+    toPathMultiPiece (RawFilePath p) = map T.pack $ FilePath.splitDirectories p
+    fromPathMultiPiece ts = let filePath = FilePath.joinPath $ map T.unpack ts
+                            in if FilePath.isValid filePath
+                              then Just $ RawFilePath filePath
+                              else Nothing
+
+
 
 data Website = Website DB.DatabaseRef
 
 mkYesod "Website" [parseRoutes|
-/ TestR GET
+/                        TestR GET
+/FileSystem/*RawFilePath BrowseForFilesR GET
 |]
 
 instance Yesod Website
@@ -44,9 +63,24 @@ getTestR = defaultLayout $ do
     setTitle "Gramophone - Testing Functions"
     [whamlet|
               <body>
-                  <h1>Testing Functions|]
+                  <h1>Testing Functions
+                  <a href=@{BrowseForFilesR (RawFilePath "/home/gordon")}>Browse for Files|]
 
-
+getBrowseForFilesR :: RawFilePath -> Handler RepHtml
+getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
+  dirContentsOrError <- liftIO $ try $ getDirectoryContents path
+  case dirContentsOrError of
+    Left e | isDoesNotExistError e -> notFound
+           | isPermissionError e   -> permissionDenied $ T.concat ["You are not allowed access to \"", (T.pack path), "\""]
+           | otherwise             -> notFound
+    Right dirContents -> do
+      setTitle "Gramophone - Browse Filesystem"
+      [whamlet|
+                <body>
+                  <h1>#{path}
+                  $forall file <- dirContents
+                    <li><a href=@{BrowseForFilesR (RawFilePath $ FilePath.combine path file)}>#{file}
+                  <a href=@{TestR}>Back to testing functions|]
 
 main :: IO ()
 main = do
