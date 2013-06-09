@@ -4,13 +4,13 @@
 import qualified Gramophone.Database as DB
 import qualified Gramophone.MediaController as MC
 
-import Control.Monad (forM_)
+import Control.Monad (forM_,filterM)
 import System.Directory (createDirectoryIfMissing,getHomeDirectory)
 import Yesod
 
 import qualified Data.Text as T
 import qualified System.FilePath as FilePath
-import System.Directory(getDirectoryContents)
+import System.Directory(getDirectoryContents,doesDirectoryExist)
 import System.IO.Error(isDoesNotExistError,isPermissionError)
 import Control.Exception(try)
 
@@ -74,12 +74,13 @@ getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
            | isPermissionError e   -> permissionDenied $ T.concat ["You are not allowed access to \"", (T.pack path), "\""]
            | otherwise             -> notFound
     Right dirContents -> do
+      subDirs <- liftIO $ filterM doesDirectoryExist $ map (FilePath.combine path) dirContents
       setTitle "Gramophone - Browse Filesystem"
       [whamlet|
                 <body>
                   <h1>#{path}
-                  $forall file <- dirContents
-                    <li><a href=@{BrowseForFilesR (RawFilePath $ FilePath.combine path file)}>#{file}
+                  $forall dir <- subDirs
+                    <li><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}
                   <a href=@{TestR}>Back to testing functions|]
 
 main :: IO ()
