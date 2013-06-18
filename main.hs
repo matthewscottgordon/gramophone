@@ -67,6 +67,22 @@ getTestR = defaultLayout $ do
                   <h1>Testing Functions
                   <a href=@{BrowseForFilesR (RawFilePath "/home/gordon")}>Browse for Files|]
 
+fileListWidget :: [FilePath.FilePath] -> Widget
+fileListWidget files = toWidget [hamlet|
+                  <div>
+                    <h2>Files:
+                    <ol>
+                      $forall file <- sort files
+                        <li>#{FilePath.takeFileName file}|]
+
+dirListWidget :: [FilePath.FilePath] -> Widget
+dirListWidget dirs = toWidget [hamlet|
+                  <div>
+                    <h2>Subfolders:
+                    <ol>
+                      $forall dir <- sort dirs
+                        <li><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}</a>|]
+
 getBrowseForFilesR :: RawFilePath -> Handler RepHtml
 getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
   dirContentsOrError <- liftIO $ try $ (liftM $ map $ FilePath.combine path) $ getDirectoryContents path
@@ -75,24 +91,16 @@ getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
            | isPermissionError e   -> permissionDenied $ T.concat ["You are not allowed access to \"", (T.pack path), "\""]
            | otherwise             -> notFound
     Right dirContents -> do
-      subDirs <- liftIO $ filterM doesDirectoryExist $ map (FilePath.combine path) dirContents
-      files <- liftIO $ filterM doesFileExist $ map (FilePath.combine path) dirContents
       setTitle "Gramophone - Browse Filesystem"
-      [whamlet|
-                <body>
-                  <h1>#{path}
-                  <div>
-                    <h2>Files:
-                    <ol>
-                    $forall file <- sort files
-                      <li>#{FilePath.takeFileName file}
-                  <div>
-                    <h2>Subfolders:
-                    <ol>
-                    $forall dir <- sort subDirs
-                      <li><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}</a>
-                  <div>
-                    <a href=@{TestR}>Back to testing functions|]
+      toWidget [hamlet|<h1>#{path}|]
+      
+      files <- liftIO $ filterM doesFileExist $ map (FilePath.combine path) dirContents
+      fileListWidget files
+      
+      subDirs <- liftIO $ filterM doesDirectoryExist $ map (FilePath.combine path) dirContents
+      dirListWidget subDirs
+
+      [whamlet|<div><a href=@{TestR}>Back to testing functions</a>|]
 
 main :: IO ()
 main = do
