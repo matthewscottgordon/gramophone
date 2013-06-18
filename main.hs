@@ -68,20 +68,40 @@ getTestR = defaultLayout $ do
                   <a href=@{BrowseForFilesR (RawFilePath "/home/gordon")}>Browse for Files|]
 
 fileListWidget :: [FilePath.FilePath] -> Widget
-fileListWidget files = toWidget [hamlet|
-                  <div>
-                    <h2>Files:
-                    <ol>
-                      $forall file <- sort files
-                        <li>#{FilePath.takeFileName file}|]
+fileListWidget files = do
+  fileListClass <- newIdent
+  toWidget [hamlet|
+            <div>
+              <h2>Files:
+              <ol .#{fileListClass}>
+                $forall file <- sort files
+                  <li>#{FilePath.takeFileName file}|]
+  toWidget [cassius|
+            ol.#{fileListClass}
+               list-style-type: none|]
+              
 
 dirListWidget :: [FilePath.FilePath] -> Widget
-dirListWidget dirs = toWidget [hamlet|
-                  <div>
-                    <h2>Subfolders:
-                    <ol>
-                      $forall dir <- sort dirs
-                        <li><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}</a>|]
+dirListWidget dirs = do
+  dirListClass <- newIdent
+  toWidget [hamlet|
+            <div .#{dirListClass}>
+              <h2>Subfolders:
+              <ol .#{dirListClass}>
+                $forall dir <- sort dirs
+                  <li .#{dirListClass}><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}</a>
+              <br .#{dirListClass}>|]
+  toWidget [cassius|
+            ol.#{dirListClass}
+              list-style-type:none
+            li.#{dirListClass}
+              float: left
+              width: 30em
+              white-space: nowrap
+            br.#{dirListClass}
+              clear: left
+            div.#{dirListClass}
+              margin-bottom: 1em|]
 
 getBrowseForFilesR :: RawFilePath -> Handler RepHtml
 getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
