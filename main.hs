@@ -4,13 +4,13 @@
 import qualified Gramophone.Database as DB
 import qualified Gramophone.MediaController as MC
 
-import Control.Monad (forM_,filterM)
+import Control.Monad (forM_,filterM,liftM)
 import System.Directory (createDirectoryIfMissing,getHomeDirectory)
 import Yesod
 
 import qualified Data.Text as T
 import qualified System.FilePath as FilePath
-import System.Directory(getDirectoryContents,doesDirectoryExist)
+import System.Directory(getDirectoryContents,doesDirectoryExist,doesFileExist)
 import System.IO.Error(isDoesNotExistError,isPermissionError)
 import Control.Exception(try)
 import Data.List(sort)
@@ -69,20 +69,30 @@ getTestR = defaultLayout $ do
 
 getBrowseForFilesR :: RawFilePath -> Handler RepHtml
 getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
-  dirContentsOrError <- liftIO $ try $ getDirectoryContents path
+  dirContentsOrError <- liftIO $ try $ (liftM $ map $ FilePath.combine path) $ getDirectoryContents path
   case dirContentsOrError of
     Left e | isDoesNotExistError e -> notFound
            | isPermissionError e   -> permissionDenied $ T.concat ["You are not allowed access to \"", (T.pack path), "\""]
            | otherwise             -> notFound
     Right dirContents -> do
       subDirs <- liftIO $ filterM doesDirectoryExist $ map (FilePath.combine path) dirContents
+      files <- liftIO $ filterM doesFileExist $ map (FilePath.combine path) dirContents
       setTitle "Gramophone - Browse Filesystem"
       [whamlet|
                 <body>
                   <h1>#{path}
-                  $forall dir <- sort subDirs
-                    <li><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}
-                  <a href=@{TestR}>Back to testing functions|]
+                  <div>
+                    <h2>Files:
+                    <ol>
+                    $forall file <- sort files
+                      <li>#{FilePath.takeFileName file}
+                  <div>
+                    <h2>Subfolders:
+                    <ol>
+                    $forall dir <- sort subDirs
+                      <li><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}</a>
+                  <div>
+                    <a href=@{TestR}>Back to testing functions|]
 
 main :: IO ()
 main = do
