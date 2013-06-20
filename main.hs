@@ -69,38 +69,40 @@ getTestR = defaultLayout $ do
 
 fileListWidget :: [FilePath.FilePath] -> Widget
 fileListWidget files = do
-  fileListClass <- newIdent
+  fileListID <- newIdent
   toWidget [hamlet|
             <div>
               <h2>Files:
-              <ol .#{fileListClass}>
+              <ol id="#{fileListID}">
                 $forall file <- sort files
                   <li>#{FilePath.takeFileName file}|]
   toWidget [cassius|
-            ol.#{fileListClass}
+            ol##{fileListID}
                list-style-type: none|]
+               
               
 
 dirListWidget :: [FilePath.FilePath] -> Widget
 dirListWidget dirs = do
-  dirListClass <- newIdent
+  divID <- newIdent
+  dirListID <- newIdent
   toWidget [hamlet|
-            <div .#{dirListClass}>
+            <div id="#{divID}">
               <h2>Subfolders:
-              <ol .#{dirListClass}>
+              <ol id="#{dirListID}">
                 $forall dir <- sort dirs
-                  <li .#{dirListClass}><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}</a>
-              <br .#{dirListClass}>|]
+                  <li><a href=@{BrowseForFilesR (RawFilePath dir)}>#{FilePath.takeFileName dir}</a>
+              <br>|]
   toWidget [cassius|
-            ol.#{dirListClass}
+            ol##{dirListID}
               list-style-type:none
-            li.#{dirListClass}
+            ol##{dirListID} li
               float: left
               width: 30em
               white-space: nowrap
-            br.#{dirListClass}
+            div##{divID} br
               clear: left
-            div.#{dirListClass}
+            div##{divID}
               margin-bottom: 1em|]
 
 getBrowseForFilesR :: RawFilePath -> Handler RepHtml
