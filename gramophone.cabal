@@ -17,4 +17,4 @@ cabal-version:       >=1.8
 executable gramophone
   main-is:             main.hs       
   other-modules:       Gramophone.Database, Gramophone.MediaController
-  build-depends:       base, text, filepath, gstreamer, glib, yesod, HDBC, HDBC-sqlite3, directory
+  build-depends:       base, text, filepath, gstreamer, glib, yesod, shakespeare-js, HDBC, HDBC-sqlite3, directory

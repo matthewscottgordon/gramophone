@@ -7,6 +7,7 @@ import qualified Gramophone.MediaController as MC
 import Control.Monad (forM_,filterM,liftM)
 import System.Directory (createDirectoryIfMissing,getHomeDirectory)
 import Yesod
+import Text.Julius(rawJS)
 
 import qualified Data.Text as T
 import qualified System.FilePath as FilePath
@@ -84,6 +85,7 @@ fileListWidget files = do
 
 dirListWidget :: [FilePath.FilePath] -> Widget
 dirListWidget dirs = do
+  addScriptRemote "https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"
   divID <- newIdent
   dirListID <- newIdent
   toWidget [hamlet|
@@ -98,12 +100,23 @@ dirListWidget dirs = do
               list-style-type:none
             ol##{dirListID} li
               float: left
-              width: 30em
+              min-width: 5em
               white-space: nowrap
             div##{divID} br
               clear: left
             div##{divID}
               margin-bottom: 1em|]
+  -- This javascript finds the largest width of any list item (directory name) and sets the width
+  -- of all the list items to that width. Together with the above CSS, this creates a multi-column
+  -- list where the columns are always wide enough to accomodate their contents. Each column has
+  -- a minumum width of 5 ems.
+  toWidget [julius|
+            $('ol##{rawJS dirListID}').ready(function() {
+              elementWidth = Math.max.apply( null, $('ol##{rawJS dirListID} > li').map( function() {
+                return $(this).innerWidth(true);
+              }).get() );
+              $('ol##{rawJS dirListID} > li').width(elementWidth);
+            });|]
 
 getBrowseForFilesR :: RawFilePath -> Handler RepHtml
 getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
