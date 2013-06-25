@@ -7,6 +7,7 @@ import qualified Gramophone.Database as DB
 import qualified Gramophone.MediaController as MC
 
 import Control.Monad (forM_,filterM,liftM)
+import Control.Applicative((<$>))
 import System.Directory (createDirectoryIfMissing,getHomeDirectory)
 import Yesod
 import Text.Julius(rawJS)
@@ -46,10 +47,11 @@ instance Yesod Website
 getTestR :: Handler RepHtml
 getTestR = defaultLayout $ do
     setTitle "Gramophone - Testing Functions"
+    browseFilesStartDir <- liftIO $ RawFilePath <$> getHomeDirectory
     [whamlet|
               <body>
                   <h1>Testing Functions
-                  <a href=@{BrowseForFilesR (RawFilePath "/home/gordon")}>Browse for Files|]
+                  <a href=@{BrowseForFilesR browseFilesStartDir}>Browse for Files|]
 
 fileListWidget :: [FilePath.FilePath] -> Widget
 fileListWidget files = do
