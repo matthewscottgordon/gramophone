@@ -60,19 +60,33 @@ openOrCreateDatabase filename = do
 createNewDatabase :: String -> IO Connection
 createNewDatabase filename = do
   conn <- connectSqlite3 filename
-  r <- quickQuery' conn
-                   "CREATE TABLE tracks (\n\
-                   \        track_id            INTEGER UNIQUE,\n\
-                   \        file                VARCHAR(1024),\n\
-                   \        title               VARCHAR(256),\n\
-                   \        album               VARCHAR(256),\n\
-                   \        track_number        INTEGER,\n\
-                   \        num_tracks_in_album INTEGER,\n\
-                   \        disc_number         INTEGER,\n\
-                   \        num_discs_in_album  INTEGER,\n\
-                   \        artist              VARCHAR(256)\n\
-                   \    );\n"
-                   []
+  run conn
+      "CREATE TABLE recordings (\n\
+       \        id                  INTEGER PRIMARY KEY,\n\
+       \        file                VARCHAR(1024),\n\
+       \        title               VARCHAR(256),\n\
+       \        artist              INTEGER,\n\
+       \        album               INTEGER,\n\
+       \        track_number        INTEGER,\n\
+       \        FOREIGN KEY(album)  REFERENCES albums(id),\n\
+       \        FOREIGN KEY(artist) REFERENCES artists(id)\n\
+       \    );\n"
+       []
+  run conn
+      "CREATE TABLE albums (\n\
+       \        id                  INTEGER PRIMARY KEY,\n\
+       \        title               VARCHAR(1024),\n\
+       \        artist              INTEGER,\n\
+       \        num_tracks          INTEGER,\n\
+       \        FOREIGN KEY(artist) REFERENCES artists(id)\n\
+       \    );\n"
+       []
+  run conn
+      "CREATE TABLE artists (\n\
+      \         id                  INTEGER PRIMARY KEY,\n\
+      \         name                VARCHAR(1024)\n\
+      \    );\n"
+      []
   commit conn
   return (Connection conn)
 
