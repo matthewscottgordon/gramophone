@@ -22,14 +22,19 @@ data Connection = Connection Database.HDBC.Sqlite3.Connection
 
 data DatabaseRef = DatabaseRef String
 
+
+printSqlError :: SqlError -> IO ()
+printSqlError e = putStrLn $ show e
+
+
 getDatabaseRef :: String -> IO (Either String DatabaseRef)
 getDatabaseRef filename = do
   fileExists <- doesFileExist filename
   maybeDB <- if fileExists
     then
-      catchSql (Just <$> openDatabase filename) $ \e -> return Nothing
+      catchSql (Just <$> openDatabase filename) $ \e -> printSqlError e >> return Nothing
     else
-      Just <$> createNewDatabase filename
+      catchSql (Just <$> createNewDatabase filename) $ \e -> printSqlError e >> return Nothing
   case maybeDB of
     Just db -> closeDatabase db >> (return $ Right $ DatabaseRef filename)
     Nothing -> return $ Left "Error"
