@@ -1,4 +1,4 @@
-{-# LANGUAGE  OverloadedStrings #-}
+{-# LANGUAGE  OverloadedStrings, MultiParamTypeClasses #-}
 
 module Gramophone.Database 
     (
@@ -14,7 +14,8 @@ module Gramophone.Database
      findArtist,
      Album,
      AlbumID(),
-     findAlbum,
+     findAlbums,
+     getAlbum,
      Recording,
      RecordingID()
     ) where
@@ -62,6 +63,42 @@ data Artist = Artist {
      artistName :: Text
 } deriving Show
 
+instance Convertible SqlValue ArtistID where
+     safeConvert = (fmap ArtistID) . safeConvert
+
+instance Convertible SqlValue AlbumID where
+     safeConvert = (fmap AlbumID) . safeConvert
+
+instance Convertible SqlValue RecordingID where
+     safeConvert = (fmap RecordingID) . safeConvert
+
+instance Convertible ArtistID SqlValue where
+     safeConvert (ArtistID a) = safeConvert a
+
+instance Convertible AlbumID SqlValue where
+     safeConvert (AlbumID a) = safeConvert a
+
+instance Convertible RecordingID SqlValue where
+     safeConvert (RecordingID a) = safeConvert a
+
+
+convert1 :: Convertible a b => [a] -> b
+convert1 (a:_) = convert a
+convert2 :: Convertible a b => Convertible a c => [a] -> (b, c)
+convert2 (a:b:_) = (convert a, convert b)
+
+convert3 :: Convertible a b => Convertible a c => Convertible a d => [a] -> (b, c, d)
+convert3 (a:b:c:_) = (convert a, convert b, convert c)
+
+convert4 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => [a] -> (b, c, d, e)
+convert4 (a:b:c:d:_) = (convert a, convert b, convert c, convert d)
+
+convert5 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => Convertible a f => [a] -> (b, c, d, e, f)
+convert5 (a:b:c:d:e:_) = (convert a, convert b, convert c, convert d, convert e)
+
+convert6 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => Convertible a f => Convertible a g =>
+            [a] -> (b, c, d, e, f, g)
+convert6 (a:b:c:d:e:f:_) = (convert a, convert b, convert c, convert d, convert e, convert f)
 
 data Connection = Connection Database.HDBC.Sqlite3.Connection
 
@@ -193,14 +230,22 @@ getNewArtistID' (Connection conn) = do
     run conn "UPDATE last_ids SET artist_id=?" [convert newID]
     return newID
 
-findAlbum :: Text -> DatabaseRef -> IO [Album]
-findAlbum name db = do
-    let DatabaseRef filename = db
-    Connection conn <- openDatabase filename
-    r <- quickQuery conn "SELECT id, title, artist, num_tracks FROM artists WHERE name = ?;" [convert name]
-    r' <- mapM (albumFromSql db) r
-    disconnect conn
-    return r'
-  where albumFromSql db (idV:titleV:artistV:numTracksV:[]) = do
-                                            artist <- getArtist (ArtistID (convert artistV)) db
-                                            return $ Album (AlbumID (convert idV)) (convert titleV) artist (convert numTracksV)
+
+findAlbums :: Text -> DatabaseRef -> IO [Album]
+findAlbums title db = withDatabase db $ findAlbum' title
+
+findAlbum' :: Text -> Connection -> IO [Album]
+findAlbum' title (Connection conn) = do
+    r <- quickQuery' conn "SELECT id FROM albums WHERE title = ?;" [convert title]
+    forM r $ \x ->
+      getAlbum' (convert1 x) (Connection conn)
+
+getAlbum :: AlbumID -> DatabaseRef -> IO Album
+getAlbum a db = withDatabase db $ getAlbum' a
+
+getAlbum' :: AlbumID -> Connection -> IO Album
+getAlbum' albumID (Connection conn) = do
+    r <- quickQuery' conn "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
+    let (title, artistID, numTracks) = convert3 $ head r
+    artist <- getArtist' artistID (Connection conn)
+    return $ Album albumID title artist numTracks
