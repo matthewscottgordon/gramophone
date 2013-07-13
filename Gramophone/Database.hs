@@ -20,9 +20,14 @@ module Gramophone.Database
      NewAlbum(..),
      addAlbum,
 
+     FileName,
+     Title,
+     TrackCount,
      Recording(..),
      RecordingID(),
-     getRecording
+     getRecording,
+     NewRecording(..),
+     addRecording
     ) where
 
 import qualified Data.Text as T
@@ -43,14 +48,18 @@ import System.Directory (doesFileExist)
 -- |Opaque type containing a unique identifier for a Recording
 data RecordingID = RecordingID Integer deriving Show
 
+type FileName = Text      -- ^ The name of an audio file
+type Title = Text         -- ^ The title of a recording
+type TrackCount = Integer -- ^ The number of recordings in a album
+
 -- |Record describing an audio file
 data Recording = Recording {
      recordingId          :: RecordingID,
-     recordingFile        :: Text,
-     recordingTitle       :: Text,
+     recordingFile        :: FileName,
+     recordingTitle       :: Title,
      recordingArtist      :: Artist,
      recordingAlbum       :: Album,
-     recordingTrackNumber :: Integer
+     recordingTrackNumber :: TrackCount
 } deriving Show
 
 -- |Opaque type containing a unique identifier for an Album
@@ -91,27 +100,22 @@ instance Convertible AlbumID SqlValue where
 instance Convertible RecordingID SqlValue where
      safeConvert (RecordingID a) = safeConvert a
 
--- |Convenience function for unpacking a [SqlValue]
+-- Convenience functions for unpacking a [SqlValue]
 convert1 :: Convertible a b => [a] -> b
 convert1 (a:_) = convert a
 
--- |Convenience function for unpacking a [SqlValue]
 convert2 :: Convertible a b => Convertible a c => [a] -> (b, c)
 convert2 (a:b:_) = (convert a, convert b)
 
--- |Convenience function for unpacking a [SqlValue]
 convert3 :: Convertible a b => Convertible a c => Convertible a d => [a] -> (b, c, d)
 convert3 (a:b:c:_) = (convert a, convert b, convert c)
 
--- |Convenience function for unpacking a [SqlValue]
 convert4 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => [a] -> (b, c, d, e)
 convert4 (a:b:c:d:_) = (convert a, convert b, convert c, convert d)
 
--- |Convenience function for unpacking a [SqlValue]
 convert5 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => Convertible a f => [a] -> (b, c, d, e, f)
 convert5 (a:b:c:d:e:_) = (convert a, convert b, convert c, convert d, convert e)
 
--- |Convenience function for unpacking a [SqlValue]
 convert6 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => Convertible a f => Convertible a g =>
             [a] -> (b, c, d, e, f, g)
 convert6 (a:b:c:d:e:f:_) = (convert a, convert b, convert c, convert d, convert e, convert f)
@@ -307,3 +311,29 @@ getRecording' recordingID conn = do
     artist <- getArtist' artistID conn
     album <- getAlbum' albumID conn
     return $ Recording recordingID file title artist album trackNumber
+
+-- |A recording which may not yet have been added to the database
+data NewRecording = NewRecording FileName Title ArtistID AlbumID TrackCount
+
+-- |Add a new recording to the database. If successful, returns the new Recording record.
+addRecording :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
+addRecording r db = withDatabase db $ addRecording' r
+
+getNewRecordingID conn = do
+    r <- quickQuery' conn "SELECT recording_id FROM last_ids" []
+    let [[oldID]] = r
+    let newID = (convert oldID) + 1
+    run conn "UPDATE last_ids SET artist_id=?;" [convert newID]
+    return $ RecordingID newID
+
+addRecording' :: NewRecording -> Connection -> IO (Maybe Recording)
+addRecording' (NewRecording filename title artistID albumID trackCount) conn = do
+    newID <- getNewRecordingID conn
+    run conn "INSERT INTO recordings (id, title, artist, album, track_count) VALUES (?, ?, ?, ?, ?);"
+        [convert newID, convert filename, convert title, convert artistID, convert albumID, convert trackCount]
+    commit conn
+    Just <$> getRecording' newID conn
+
+
+
+
