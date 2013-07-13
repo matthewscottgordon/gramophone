@@ -12,12 +12,14 @@ module Gramophone.Database
      Artist,
      ArtistID(),
      findArtist,
+     getArtist,
      Album,
      AlbumID(),
      findAlbums,
      getAlbum,
      Recording,
-     RecordingID()
+     RecordingID(),
+     getRecording
     ) where
 
 import qualified Data.Text as T
@@ -249,3 +251,14 @@ getAlbum' albumID (Connection conn) = do
     let (title, artistID, numTracks) = convert3 $ head r
     artist <- getArtist' artistID (Connection conn)
     return $ Album albumID title artist numTracks
+
+getRecording :: RecordingID -> DatabaseRef -> IO Recording
+getRecording r db = withDatabase db $ getRecording' r
+
+getRecording' :: RecordingID -> Connection -> IO Recording
+getRecording' recordingID (Connection conn) = do
+    r <- quickQuery' conn "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
+    let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
+    artist <- getArtist' artistID (Connection conn)
+    album <- getAlbum' albumID (Connection conn)
+    return $ Recording recordingID file title artist album trackNumber
