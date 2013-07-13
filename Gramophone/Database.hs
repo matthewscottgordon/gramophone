@@ -6,6 +6,12 @@ module Gramophone.Database
      DatabaseRef(),
      getDatabaseRef,
 
+     FileName,
+     Title,
+     TrackNumber,
+     TrackCount,
+     Name,
+
      Artist(..),
      ArtistID(),
      findArtists,
@@ -20,9 +26,6 @@ module Gramophone.Database
      NewAlbum(..),
      addAlbum,
 
-     FileName,
-     Title,
-     TrackCount,
      Recording(..),
      RecordingID(),
      getRecording,
@@ -48,9 +51,11 @@ import System.Directory (doesFileExist)
 -- |Opaque type containing a unique identifier for a Recording
 data RecordingID = RecordingID Integer deriving Show
 
-type FileName = Text      -- ^ The name of an audio file
-type Title = Text         -- ^ The title of a recording
-type TrackCount = Integer -- ^ The number of recordings in a album
+type FileName = Text       -- ^ The name of an audio file
+type Title = Text          -- ^ The title of a recording or album
+type Name = Text           -- ^ The name of an artist
+type TrackNumber = Integer -- ^ The track number of a recording within it's album
+type TrackCount = Integer  -- ^ The number of recordings in a album
 
 -- |Record describing an audio file
 data Recording = Recording {
@@ -59,7 +64,7 @@ data Recording = Recording {
      recordingTitle       :: Title,
      recordingArtist      :: Artist,
      recordingAlbum       :: Album,
-     recordingTrackNumber :: TrackCount
+     recordingTrackNumber :: TrackNumber
 } deriving Show
 
 -- |Opaque type containing a unique identifier for an Album
@@ -68,9 +73,9 @@ data AlbumID = AlbumID Integer deriving Show
 -- |Record describing an album
 data Album = Album {
      albumId        :: AlbumID,
-     albumTitle     :: Text,
+     albumTitle     :: Title,
      albumArtist    :: Artist,
-     albumNumTracks :: Integer
+     albumNumTracks :: TrackCount
 } deriving Show
 
 -- |Opaque type containing a unique identifier for an Artist
@@ -79,7 +84,7 @@ data ArtistID = ArtistID Integer deriving Show
 -- |Record describing a recording artist
 data Artist = Artist {
      artistId   :: ArtistID,
-     artistName :: Text
+     artistName :: Name
 } deriving Show
 
 instance Convertible SqlValue ArtistID where
@@ -224,9 +229,7 @@ getArtist' (ArtistID i) conn = do
       [[name]] -> return $ Artist (ArtistID i) (convert name)
 
 -- |An artist which may not yet have been added to the database.
-data NewArtist = NewArtist {
-     newArtistName :: Text
-}
+data NewArtist = NewArtist Name
 
 -- |Add a new Artist to the Database. If successful, returns the new Artist record.
 addArtist :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
@@ -234,9 +237,9 @@ addArtist a db = withDatabase db $ addArtist' a
 
 -- Like addArtist, but expects a Connection rather than a DatabaseRef
 addArtist' :: NewArtist -> Connection -> IO (Maybe Artist)
-addArtist' newArtist conn = do
+addArtist' (NewArtist name) conn = do
     newID <- getNewArtistID $ conn
-    run conn "INSERT INTO artists (id, name) VALUES (?, ?);" [(convert newID), (convert $ newArtistName newArtist)]
+    run conn "INSERT INTO artists (id, name) VALUES (?, ?);" [convert newID, convert name]
     commit conn
     Just <$> getArtist' (ArtistID newID) conn
 
@@ -273,11 +276,7 @@ getAlbum' albumID conn = do
     return $ Album albumID title artist numTracks
 
 -- |An album which may not yet have been added to the database
-data NewAlbum = NewAlbum {
-      newAlbumTitle     :: Text,
-      newAlbumArtist    :: ArtistID,
-      newAlbumNumTracks :: Integer
-}
+data NewAlbum = NewAlbum Title ArtistID TrackCount
 
 -- |Add a new Album to the database. If successful, returns the new Album record.
 addAlbum :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
@@ -292,10 +291,10 @@ getNewAlbumID conn = do
     return $ AlbumID newID
 
 addAlbum' :: NewAlbum -> Connection -> IO (Maybe Album)
-addAlbum' a conn = do
+addAlbum' (NewAlbum title artistID trackCount) conn = do
     newID <- getNewAlbumID conn
     run conn "INSERT INTO albums (id, title, artist, num_tracks) VALUES (?, ?, ?, ?);"
-        [convert newID, convert (newAlbumTitle a), convert (newAlbumArtist a), convert (newAlbumNumTracks a)]
+        [convert newID, convert title, convert artistID, convert trackCount]
     commit conn
     Just <$> getAlbum' newID conn
 
@@ -313,7 +312,7 @@ getRecording' recordingID conn = do
     return $ Recording recordingID file title artist album trackNumber
 
 -- |A recording which may not yet have been added to the database
-data NewRecording = NewRecording FileName Title ArtistID AlbumID TrackCount
+data NewRecording = NewRecording FileName Title ArtistID AlbumID TrackNumber
 
 -- |Add a new recording to the database. If successful, returns the new Recording record.
 addRecording :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
@@ -327,10 +326,10 @@ getNewRecordingID conn = do
     return $ RecordingID newID
 
 addRecording' :: NewRecording -> Connection -> IO (Maybe Recording)
-addRecording' (NewRecording filename title artistID albumID trackCount) conn = do
+addRecording' (NewRecording filename title artistID albumID trackNumber) conn = do
     newID <- getNewRecordingID conn
-    run conn "INSERT INTO recordings (id, title, artist, album, track_count) VALUES (?, ?, ?, ?, ?);"
-        [convert newID, convert filename, convert title, convert artistID, convert albumID, convert trackCount]
+    run conn "INSERT INTO recordings (id, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?);"
+        [convert newID, convert filename, convert title, convert artistID, convert albumID, convert trackNumber]
     commit conn
     Just <$> getRecording' newID conn
 
