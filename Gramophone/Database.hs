@@ -24,7 +24,7 @@ import qualified Data.Text as T
 import Data.Text(Text)
 
 import Database.HDBC.Sqlite3 (connectSqlite3)
-import qualified Database.HDBC.Sqlite3 (Connection)
+import Database.HDBC.Sqlite3 (Connection)
 import Database.HDBC
 
 import Control.Monad
@@ -100,7 +100,6 @@ convert6 :: Convertible a b => Convertible a c => Convertible a d => Convertible
             [a] -> (b, c, d, e, f, g)
 convert6 (a:b:c:d:e:f:_) = (convert a, convert b, convert c, convert d, convert e, convert f)
 
-data Connection = Connection Database.HDBC.Sqlite3.Connection
 
 data DatabaseRef = DatabaseRef String
 
@@ -114,19 +113,12 @@ getDatabaseRef filename = do
   fileExists <- doesFileExist filename
   maybeDB <- if fileExists
     then
-      catchSql (Just <$> openDatabase filename) $ \e -> printSqlError e >> return Nothing
+      catchSql (Just <$> connectSqlite3 filename) $ \e -> printSqlError e >> return Nothing
     else
       catchSql (Just <$> createNewDatabase filename) $ \e -> printSqlError e >> return Nothing
   case maybeDB of
-    Just db -> closeDatabase db >> (return $ Right $ DatabaseRef filename)
+    Just db -> disconnect db >> (return $ Right $ DatabaseRef filename)
     Nothing -> return $ Left "Error"
-
-openDatabase :: String -> IO Connection
-openDatabase = return . Connection <=< connectSqlite3
-
-
-closeDatabase :: Connection -> IO ()
-closeDatabase (Connection conn) = disconnect conn
 
 
 
@@ -169,12 +161,12 @@ createNewDatabase filename = do
       []
   run conn "INSERT INTO last_ids (recording_id, album_id, artist_id) VALUES (0, 0, 0);" []
   commit conn
-  return (Connection conn)
+  return conn
 
 withDatabase :: DatabaseRef -> ( Connection -> IO b ) -> IO b
 withDatabase (DatabaseRef filename) action = do
-  Connection conn <- openDatabase filename
-  r <- action (Connection conn)
+  conn <- connectSqlite3 filename
+  r <- action conn
   disconnect conn
   return r
 
@@ -183,7 +175,7 @@ findArtist :: Text -> DatabaseRef -> IO [Artist]
 findArtist name db = withDatabase db $ findArtist' name
 
 findArtist' :: Text -> Connection -> IO [Artist]
-findArtist' name (Connection conn) = do
+findArtist' name conn = do
     r <- quickQuery' conn "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
   where artistFromSql (idValue:nameValue:[]) = Artist (ArtistID (convert idValue)) (convert nameValue)
@@ -193,7 +185,7 @@ getArtist :: ArtistID -> DatabaseRef -> IO Artist
 getArtist a db = withDatabase db $ getArtist' a
 
 getArtist' :: ArtistID -> Connection -> IO Artist
-getArtist' (ArtistID i) (Connection conn) = do
+getArtist' (ArtistID i) conn = do
     r <- quickQuery' conn "SELECT name FROM artists WHERE id = ?;" [convert i]
     case r of
       [[name]] -> return $ Artist (ArtistID i) (convert name)
@@ -206,15 +198,15 @@ addArtist :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
 addArtist a db = withDatabase db $ addArtist' a
 
 addArtist' :: NewArtist -> Connection -> IO (Maybe Artist)
-addArtist' newArtist (Connection conn) = do
-    --newID <- fromIntegral . length <$> findArtist' (newArtistName newArtist) (Connection conn)
-    newID <- getNewArtistID' $ Connection conn
+addArtist' newArtist conn = do
+    --newID <- fromIntegral . length <$> findArtist' (newArtistName newArtist) conn
+    newID <- getNewArtistID' $ conn
     run conn "INSERT INTO artists (id, name) VALUES (?, ?);" [(convert newID), (convert $ newArtistName newArtist)]
     commit conn
-    Just <$> getArtist' (ArtistID newID) (Connection conn)
+    Just <$> getArtist' (ArtistID newID) conn
 
 getNewArtistID' :: Connection -> IO Integer
-getNewArtistID' (Connection conn) = do
+getNewArtistID' conn = do
     r <- quickQuery' conn "SELECT artist_id FROM last_ids" []
     let [[oldID]] = r
     let newID = (convert oldID) + 1;
@@ -226,28 +218,28 @@ findAlbums :: Text -> DatabaseRef -> IO [Album]
 findAlbums title db = withDatabase db $ findAlbum' title
 
 findAlbum' :: Text -> Connection -> IO [Album]
-findAlbum' title (Connection conn) = do
+findAlbum' title conn = do
     r <- quickQuery' conn "SELECT id FROM albums WHERE title = ?;" [convert title]
     forM r $ \x ->
-      getAlbum' (convert1 x) (Connection conn)
+      getAlbum' (convert1 x) conn
 
 getAlbum :: AlbumID -> DatabaseRef -> IO Album
 getAlbum a db = withDatabase db $ getAlbum' a
 
 getAlbum' :: AlbumID -> Connection -> IO Album
-getAlbum' albumID (Connection conn) = do
+getAlbum' albumID conn = do
     r <- quickQuery' conn "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
     let (title, artistID, numTracks) = convert3 $ head r
-    artist <- getArtist' artistID (Connection conn)
+    artist <- getArtist' artistID conn
     return $ Album albumID title artist numTracks
 
 getRecording :: RecordingID -> DatabaseRef -> IO Recording
 getRecording r db = withDatabase db $ getRecording' r
 
 getRecording' :: RecordingID -> Connection -> IO Recording
-getRecording' recordingID (Connection conn) = do
+getRecording' recordingID conn = do
     r <- quickQuery' conn "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
     let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
-    artist <- getArtist' artistID (Connection conn)
-    album <- getAlbum' albumID (Connection conn)
+    artist <- getArtist' artistID conn
+    album <- getAlbum' albumID conn
     return $ Recording recordingID file title artist album trackNumber
