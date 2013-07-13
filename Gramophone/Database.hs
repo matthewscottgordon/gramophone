@@ -12,17 +12,21 @@ module Gramophone.Database
      getArtist,
      NewArtist(..),
      addArtist,
+
      Album(..),
      AlbumID(),
      findAlbums,
      getAlbum,
+     NewAlbum(..),
+     addAlbum,
+
      Recording(..),
      RecordingID(),
      getRecording
     ) where
 
 import qualified Data.Text as T
-import Data.Text(Text)
+import Data.Text (Text)
 
 import Database.HDBC.Sqlite3 (connectSqlite3)
 import Database.HDBC.Sqlite3 (Connection)
@@ -215,7 +219,7 @@ getArtist' (ArtistID i) conn = do
     case r of
       [[name]] -> return $ Artist (ArtistID i) (convert name)
 
--- |An artist which may not yet been added to the database.
+-- |An artist which may not yet have been added to the database.
 data NewArtist = NewArtist {
      newArtistName :: Text
 }
@@ -227,14 +231,14 @@ addArtist a db = withDatabase db $ addArtist' a
 -- Like addArtist, but expects a Connection rather than a DatabaseRef
 addArtist' :: NewArtist -> Connection -> IO (Maybe Artist)
 addArtist' newArtist conn = do
-    newID <- getNewArtistID' $ conn
+    newID <- getNewArtistID $ conn
     run conn "INSERT INTO artists (id, name) VALUES (?, ?);" [(convert newID), (convert $ newArtistName newArtist)]
     commit conn
     Just <$> getArtist' (ArtistID newID) conn
 
 -- Returns an Integer that is not currently used as an ArtistID
-getNewArtistID' :: Connection -> IO Integer
-getNewArtistID' conn = do
+getNewArtistID :: Connection -> IO Integer
+getNewArtistID conn = do
     r <- quickQuery' conn "SELECT artist_id FROM last_ids" []
     let [[oldID]] = r
     let newID = (convert oldID) + 1;
@@ -263,6 +267,33 @@ getAlbum' albumID conn = do
     let (title, artistID, numTracks) = convert3 $ head r
     artist <- getArtist' artistID conn
     return $ Album albumID title artist numTracks
+
+-- |An album which may not yet have been added to the database
+data NewAlbum = NewAlbum {
+      newAlbumTitle     :: Text,
+      newAlbumArtist    :: ArtistID,
+      newAlbumNumTracks :: Integer
+}
+
+-- |Add a new Album to the database. If successful, returns the new Album record.
+addAlbum :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
+addAlbum a db = withDatabase db $ addAlbum' a
+
+getNewAlbumID :: Connection -> IO AlbumID
+getNewAlbumID conn = do
+    r <- quickQuery' conn "SELECT album_id FROM last_ids" []
+    let [[oldID]] = r
+    let newID = (convert oldID) + 1
+    run conn "UPDATE last_ids SET album_id=?;" [convert newID]
+    return $ AlbumID newID
+
+addAlbum' :: NewAlbum -> Connection -> IO (Maybe Album)
+addAlbum' a conn = do
+    newID <- getNewAlbumID conn
+    run conn "INSERT INTO albums (id, title, artist, num_tracks) VALUES (?, ?, ?, ?);"
+        [convert newID, convert (newAlbumTitle a), convert (newAlbumArtist a), convert (newAlbumNumTracks a)]
+    commit conn
+    Just <$> getAlbum' newID conn
 
 -- |Given a RecordingID, retrieve the corresponding Recording from the database.
 getRecording :: RecordingID -> DatabaseRef -> IO Recording
