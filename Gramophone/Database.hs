@@ -8,7 +8,7 @@ module Gramophone.Database
 
      Artist(..),
      ArtistID(),
-     findArtist,
+     findArtists,
      getArtist,
      NewArtist(..),
      addArtist,
@@ -193,12 +193,12 @@ withDatabase (DatabaseRef filename) action = do
 
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
-findArtist :: Text -> DatabaseRef -> IO [Artist]
-findArtist name db = withDatabase db $ findArtist' name
+findArtists :: Text -> DatabaseRef -> IO [Artist]
+findArtists name db = withDatabase db $ findArtists' name
 
--- |Like findArtist, but expects a Connection rather than a DatabaseRef.
-findArtist' :: Text -> Connection -> IO [Artist]
-findArtist' name conn = do
+-- |Like findArtists, but expects a Connection rather than a DatabaseRef.
+findArtists' :: Text -> Connection -> IO [Artist]
+findArtists' name conn = do
     r <- quickQuery' conn "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
   where artistFromSql (idValue:nameValue:[]) = Artist (ArtistID (convert idValue)) (convert nameValue)
@@ -227,7 +227,6 @@ addArtist a db = withDatabase db $ addArtist' a
 -- Like addArtist, but expects a Connection rather than a DatabaseRef
 addArtist' :: NewArtist -> Connection -> IO (Maybe Artist)
 addArtist' newArtist conn = do
-    --newID <- fromIntegral . length <$> findArtist' (newArtistName newArtist) conn
     newID <- getNewArtistID' $ conn
     run conn "INSERT INTO artists (id, name) VALUES (?, ?);" [(convert newID), (convert $ newArtistName newArtist)]
     commit conn
