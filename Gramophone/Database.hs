@@ -2,22 +2,20 @@
 
 module Gramophone.Database 
     (
-     Connection(),
-     openDatabase,
-     closeDatabase,
-     openOrCreateDatabase,
      DatabaseRef(),
      getDatabaseRef,
 
-     Artist,
+     Artist(..),
      ArtistID(),
      findArtist,
      getArtist,
-     Album,
+     NewArtist(..),
+     addArtist,
+     Album(..),
      AlbumID(),
      findAlbums,
      getAlbum,
-     Recording,
+     Recording(..),
      RecordingID(),
      getRecording
     ) where
@@ -130,15 +128,6 @@ openDatabase = return . Connection <=< connectSqlite3
 closeDatabase :: Connection -> IO ()
 closeDatabase (Connection conn) = disconnect conn
 
-
-openOrCreateDatabase :: String -> IO Connection
-openOrCreateDatabase filename = do
-  fileExists <- doesFileExist filename
-  if fileExists
-    then
-      openDatabase filename
-    else
-      createNewDatabase filename
 
 
 createNewDatabase :: String -> IO Connection

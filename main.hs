@@ -24,11 +24,6 @@ getDataDirectory = do
   createDirectoryIfMissing False dataDir
   return dataDir
 
-openDatabase :: IO DB.Connection
-openDatabase = do
-  dataDir <- getDataDirectory
-  DB.openOrCreateDatabase ( dataDir ++ "/database" )
-
 
 
 main :: IO ()
