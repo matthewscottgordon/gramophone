@@ -177,6 +177,7 @@ printSqlError e = putStrLn $ show e
 data OpenError
     = OpenDoesNotExistError -- ^ The given filename does not exist
     | OpenFileError String  -- ^ File exists but could not be opened. String is HDBC error message.
+    deriving (Show, Eq)
 
 -- |Opens a database.
 openDatabase :: FilePath -> IO (Either OpenError DatabaseRef)
@@ -198,6 +199,7 @@ openDatabase filename = do
 data CreateError
     = CreateFileError String   -- ^ File could not be created. String is HDBC error message.
     | CreateAlreadyExistsError -- ^ File already exists.
+    deriving (Show, Eq)
 
 -- |Creates a new database. Will not overwrite an existing file
 createDatabase :: FilePath -> IO (Either CreateError DatabaseRef)
