@@ -4,7 +4,10 @@
 module Gramophone.Database 
     (
      DatabaseRef(),
-     getDatabaseRef,
+     openDatabase,
+     OpenError(..),
+     createDatabase,
+     CreateError(..),
 
      FileName,
      Title,
@@ -170,26 +173,52 @@ data DatabaseRef = DatabaseRef String
 printSqlError :: SqlError -> IO ()
 printSqlError e = putStrLn $ show e
 
+-- |Error values returned by openDatabase
+data OpenError
+    = OpenDoesNotExistError -- ^ The given filename does not exist
+    | OpenFileError String  -- ^ File exists but could not be opened. String is HDBC error message.
 
--- |Checks that a database file exists, creates it if it doesn't, and returns a DatabaseRef to the database
-getDatabaseRef :: String                         -- ^The name of the database file
-               -> IO (Either String DatabaseRef)
-getDatabaseRef filename = do
+-- |Opens a database.
+openDatabase :: FilePath -> IO (Either OpenError DatabaseRef)
+openDatabase filename = do
   fileExists <- doesFileExist filename
-  maybeDB <- if fileExists
+  if fileExists 
     then
-      catchSql (Just <$> connectSqlite3 filename) $ \e -> printSqlError e >> return Nothing
+      catchSql checkDatabase $ \e -> return $ Left $ OpenFileError $ show e
     else
-      catchSql (Just <$> createNewDatabase filename) $ \e -> printSqlError e >> return Nothing
-  case maybeDB of
-    Just db -> disconnect db >> (return $ Right $ DatabaseRef filename)
-    Nothing -> return $ Left "Error"
+      return $ Left OpenDoesNotExistError
+  where
+    checkDatabase = do
+        conn <- connectSqlite3 filename
+        -- Eventually, code for checking schema goes here.
+        disconnect conn
+        return $ Right $ DatabaseRef filename
+
+-- | Error values returned by createDatabase
+data CreateError
+    = CreateFileError String   -- ^ File could not be created. String is HDBC error message.
+    | CreateAlreadyExistsError -- ^ File already exists.
+
+-- |Creates a new database. Will not overwrite an existing file
+createDatabase :: FilePath -> IO (Either CreateError DatabaseRef)
+createDatabase filename = do
+  fileExists <- doesFileExist filename
+  if fileExists
+    then
+      return $ Left CreateAlreadyExistsError
+    else
+      catchSql ( Right <$> createDatabase' filename) $ \e -> return $ Left $ CreateFileError $ show e
 
 
--- Given a filename, create a new Sqlite database and set up the schema
-createNewDatabase :: String -> IO Connection
-createNewDatabase filename = do
+createDatabase' :: FilePath -> IO DatabaseRef
+createDatabase' filename = do
   conn <- connectSqlite3 filename
+  initSchema conn
+  disconnect conn
+  return $ DatabaseRef filename
+
+initSchema :: Connection -> IO ()
+initSchema conn = do
   run conn
       "CREATE TABLE recordings (\n\
        \        id                  INTEGER PRIMARY KEY,\n\
@@ -226,7 +255,6 @@ createNewDatabase filename = do
       []
   run conn "INSERT INTO last_ids (recording_id, album_id, artist_id) VALUES (0, 0, 0);" []
   commit conn
-  return conn
 
 
 -- Opens the database, calls a function which takes a database Connection, closes the

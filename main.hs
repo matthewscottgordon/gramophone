@@ -31,7 +31,7 @@ main = do
      MC.initMediaController
 
      dataDir <- getDataDirectory
-     dbRefOrError <- DB.getDatabaseRef (dataDir ++ "/database")
+     dbRefOrError <- DB.openDatabase (dataDir ++ "/database")
      case dbRefOrError of
        Right dbRef   -> GUI.startGUI dbRef
-       Left errorMsg -> putStrLn ("Could not open Database: " ++ errorMsg)
+       Left a -> putStrLn "Could not open Database."
