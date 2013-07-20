@@ -4,6 +4,7 @@
 import qualified Gramophone.Database as DB
 import qualified Gramophone.MediaController as MC
 import qualified Gramophone.GUI as GUI
+import Gramophone.Gramophone
 
 import Control.Monad (forM_)
 import System.Directory (createDirectoryIfMissing,getHomeDirectory)
