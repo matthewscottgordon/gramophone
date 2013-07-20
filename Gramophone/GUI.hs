@@ -44,7 +44,7 @@ mkYesod "Website" [parseRoutes|
 
 instance Yesod Website
 
-getTestR :: Handler RepHtml
+getTestR :: Handler Html
 getTestR = defaultLayout $ do
     setTitle "Gramophone - Testing Functions"
     browseFilesStartDir <- liftIO $ RawFilePath <$> getHomeDirectory
@@ -103,7 +103,7 @@ dirListWidget dirs = do
               $('ol##{rawJS dirListID} > li').width(elementWidth);
             });|]
 
-getBrowseForFilesR :: RawFilePath -> Handler RepHtml
+getBrowseForFilesR :: RawFilePath -> Handler Html
 getBrowseForFilesR (RawFilePath path) = defaultLayout $ do
   dirContentsOrError <- liftIO $ try $ (liftM $ map $ FilePath.combine path) $ getDirectoryContents path
   case dirContentsOrError of
