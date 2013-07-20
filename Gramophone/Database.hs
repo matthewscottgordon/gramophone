@@ -51,11 +51,45 @@ import System.Directory (doesFileExist)
 -- |Opaque type containing a unique identifier for a Recording
 data RecordingID = RecordingID Integer deriving Show
 
-type FileName = Text       -- ^ The name of an audio file
-type Title = Text          -- ^ The title of a recording or album
-type Name = Text           -- ^ The name of an artist
-type TrackNumber = Integer -- ^ The track number of a recording within it's album
-type TrackCount = Integer  -- ^ The number of recordings in a album
+-- |The name of an audio file
+newtype FileName = FileName Text
+    deriving Show
+instance Convertible SqlValue FileName where
+    safeConvert = (fmap FileName) . safeConvert
+instance Convertible FileName SqlValue where
+     safeConvert (FileName a) = safeConvert a
+
+-- |The title of a recording or album
+newtype Title = Title Text
+    deriving Show
+instance Convertible SqlValue Title where
+    safeConvert = (fmap Title) . safeConvert
+instance Convertible Title SqlValue where
+     safeConvert (Title a) = safeConvert a
+
+-- |The name of an artist
+newtype Name = Name Text
+    deriving Show
+instance Convertible SqlValue Name where
+    safeConvert = (fmap Name) . safeConvert
+instance Convertible Name SqlValue where
+     safeConvert (Name a) = safeConvert a
+
+-- |The track number of a recording within it's album
+newtype TrackNumber = TrackNumber Integer
+    deriving Show
+instance Convertible SqlValue TrackNumber where
+    safeConvert = (fmap TrackNumber) . safeConvert
+instance Convertible TrackNumber SqlValue where
+     safeConvert (TrackNumber a) = safeConvert a
+
+-- |The number of recordings in a album
+newtype TrackCount = TrackCount Integer
+    deriving Show
+instance Convertible SqlValue TrackCount where
+    safeConvert = (fmap TrackCount) . safeConvert
+instance Convertible TrackCount SqlValue where
+     safeConvert (TrackCount a) = safeConvert a
 
 -- |Record describing an audio file
 data Recording = Recording {
