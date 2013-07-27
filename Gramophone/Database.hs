@@ -51,8 +51,14 @@ import Data.Convertible
 import System.Directory (doesFileExist)
 
 
+data Id a = Id Integer
+    deriving Show
+
+
 -- |Opaque type containing a unique identifier for a Recording
-data RecordingID = RecordingID Integer deriving Show
+--data RecordingIDType
+type RecordingID = Id Recording
+--data RecordingID = RecordingID Integer deriving Show
 
 -- |The name of an audio file
 newtype FileName = FileName Text
@@ -105,7 +111,7 @@ data Recording = Recording {
 } deriving Show
 
 -- |Opaque type containing a unique identifier for an Album
-data AlbumID = AlbumID Integer deriving Show
+type AlbumID = Id Album
 
 -- |Record describing an album
 data Album = Album {
@@ -116,7 +122,7 @@ data Album = Album {
 } deriving Show
 
 -- |Opaque type containing a unique identifier for an Artist
-data ArtistID = ArtistID Integer deriving Show
+type ArtistID = Id Album
 
 -- |Record describing a recording artist
 data Artist = Artist {
@@ -124,23 +130,11 @@ data Artist = Artist {
      artistName :: Name
 } deriving Show
 
-instance Convertible SqlValue ArtistID where
-     safeConvert = (fmap ArtistID) . safeConvert
+instance Convertible SqlValue (Id a) where
+     safeConvert = (fmap Id) . safeConvert
 
-instance Convertible SqlValue AlbumID where
-     safeConvert = (fmap AlbumID) . safeConvert
-
-instance Convertible SqlValue RecordingID where
-     safeConvert = (fmap RecordingID) . safeConvert
-
-instance Convertible ArtistID SqlValue where
-     safeConvert (ArtistID a) = safeConvert a
-
-instance Convertible AlbumID SqlValue where
-     safeConvert (AlbumID a) = safeConvert a
-
-instance Convertible RecordingID SqlValue where
-     safeConvert (RecordingID a) = safeConvert a
+instance Convertible (Id a) SqlValue where
+     safeConvert (Id val) = safeConvert val
 
 -- Convenience functions for unpacking a [SqlValue]
 convert1 :: Convertible a b => [a] -> b
@@ -278,7 +272,7 @@ findArtists' :: Text -> Connection -> IO [Artist]
 findArtists' name conn = do
     r <- quickQuery' conn "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
-  where artistFromSql (idValue:nameValue:[]) = Artist (ArtistID (convert idValue)) (convert nameValue)
+  where artistFromSql (idValue:nameValue:[]) = Artist (Id (convert idValue)) (convert nameValue)
 
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
@@ -287,10 +281,10 @@ getArtist a db = withDatabase db $ getArtist' a
 
 -- |Like getArtist, but expects a Connection rather than a DatabaseRef,
 getArtist' :: ArtistID -> Connection -> IO Artist
-getArtist' (ArtistID i) conn = do
+getArtist' (Id i) conn = do
     r <- quickQuery' conn "SELECT name FROM artists WHERE id = ?;" [convert i]
     case r of
-      [[name]] -> return $ Artist (ArtistID i) (convert name)
+      [[name]] -> return $ Artist (Id i) (convert name)
 
 -- |An artist which may not yet have been added to the database.
 data NewArtist = NewArtist Name
@@ -305,7 +299,7 @@ addArtist' (NewArtist name) conn = do
     newID <- getNewArtistID $ conn
     run conn "INSERT INTO artists (id, name) VALUES (?, ?);" [convert newID, convert name]
     commit conn
-    Just <$> getArtist' (ArtistID newID) conn
+    Just <$> getArtist' (Id newID) conn
 
 -- Returns an Integer that is not currently used as an ArtistID
 getNewArtistID :: Connection -> IO Integer
@@ -352,7 +346,7 @@ getNewAlbumID conn = do
     let [[oldID]] = r
     let newID = (convert oldID) + 1
     run conn "UPDATE last_ids SET album_id=?;" [convert newID]
-    return $ AlbumID newID
+    return $ Id newID
 
 addAlbum' :: NewAlbum -> Connection -> IO (Maybe Album)
 addAlbum' (NewAlbum title artistID trackCount) conn = do
@@ -387,7 +381,7 @@ getNewRecordingID conn = do
     let [[oldID]] = r
     let newID = (convert oldID) + 1
     run conn "UPDATE last_ids SET artist_id=?;" [convert newID]
-    return $ RecordingID newID
+    return $ Id newID
 
 addRecording' :: NewRecording -> Connection -> IO (Maybe Recording)
 addRecording' (NewRecording filename title artistID albumID trackNumber) conn = do
