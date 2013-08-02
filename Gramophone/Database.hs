@@ -39,11 +39,11 @@ module Gramophone.Database
 import qualified Data.Text as T
 import Data.Text (Text)
 
-import Database.HDBC.Sqlite3 (connectSqlite3)
-import Database.HDBC.Sqlite3 (Connection)
+import qualified Database.HDBC.Sqlite3 as Sqlite
 import Database.HDBC
 
 import Control.Monad
+import Control.Monad.Reader
 import Data.Functor
 
 import Data.Convertible
@@ -56,9 +56,7 @@ data Id a = Id Integer
 
 
 -- |Opaque type containing a unique identifier for a Recording
---data RecordingIDType
 type RecordingID = Id Recording
---data RecordingID = RecordingID Integer deriving Show
 
 -- |The name of an audio file
 newtype FileName = FileName Text
@@ -184,7 +182,7 @@ openDatabase filename = do
       return $ Left OpenDoesNotExistError
   where
     checkDatabase = do
-        conn <- connectSqlite3 filename
+        conn <- Sqlite.connectSqlite3 filename
         -- Eventually, code for checking schema goes here.
         disconnect conn
         return $ Right $ DatabaseRef filename
@@ -208,12 +206,12 @@ createDatabase filename = do
 
 createDatabase' :: FilePath -> IO DatabaseRef
 createDatabase' filename = do
-  conn <- connectSqlite3 filename
+  conn <- Sqlite.connectSqlite3 filename
   initSchema conn
   disconnect conn
   return $ DatabaseRef filename
 
-initSchema :: Connection -> IO ()
+initSchema :: Sqlite.Connection -> IO ()
 initSchema conn = do
   run conn
       "CREATE TABLE recordings (\n\
@@ -253,38 +251,55 @@ initSchema conn = do
   commit conn
 
 
--- Opens the database, calls a function which takes a database Connection, closes the
--- database, and returns the result of the called function.
-withDatabase :: DatabaseRef -> ( Connection -> IO b ) -> IO b
+-- | Database actions
+type DBIO a = ReaderT Sqlite.Connection IO a
+
+-- Opens the database, performs the action DBIO, closes the
+-- database, and returns the result of the action.
+withDatabase :: DatabaseRef -> DBIO b -> IO b
 withDatabase (DatabaseRef filename) action = do
-  conn <- connectSqlite3 filename
-  r <- action conn
+  conn <- Sqlite.connectSqlite3 filename
+  r <- runReaderT action conn
   disconnect conn
   return r
+
+
+queryDB' :: String -> [SqlValue] -> DBIO [[SqlValue]]
+queryDB' sql values = do
+  conn <- ask
+  liftIO $ quickQuery' conn sql values
+
+
+runDB :: String -> [SqlValue] -> DBIO Integer
+runDB sql values = do
+  conn <- ask
+  liftIO $ run conn sql values
+
+commitDB :: DBIO ()
+commitDB = do
+  conn <- ask
+  liftIO $ commit conn
 
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
 findArtists :: Text -> DatabaseRef -> IO [Artist]
 findArtists name db = withDatabase db $ findArtists' name
 
--- |Like findArtists, but expects a Connection rather than a DatabaseRef.
-findArtists' :: Text -> Connection -> IO [Artist]
-findArtists' name conn = do
-    r <- quickQuery' conn "SELECT id, name FROM artists WHERE name = ?;" [convert name]
+
+findArtists' :: Text -> DBIO [Artist]
+findArtists' name = do
+    r <- queryDB' "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
   where artistFromSql (idValue:nameValue:[]) = Artist (Id (convert idValue)) (convert nameValue)
-
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
 getArtist :: ArtistID -> DatabaseRef -> IO Artist
 getArtist a db = withDatabase db $ getArtist' a
 
--- |Like getArtist, but expects a Connection rather than a DatabaseRef,
-getArtist' :: ArtistID -> Connection -> IO Artist
-getArtist' (Id i) conn = do
-    r <- quickQuery' conn "SELECT name FROM artists WHERE id = ?;" [convert i]
-    case r of
-      [[name]] -> return $ Artist (Id i) (convert name)
+getArtist' :: ArtistID -> DBIO Artist
+getArtist' (Id i) = do
+  [[name]] <- queryDB' "SELECT name FROM artists WHERE id = ?;" [convert i]
+  return $ Artist (Id i) (convert name)
 
 -- |An artist which may not yet have been added to the database.
 data NewArtist = NewArtist Name
@@ -293,44 +308,40 @@ data NewArtist = NewArtist Name
 addArtist :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
 addArtist a db = withDatabase db $ addArtist' a
 
--- Like addArtist, but expects a Connection rather than a DatabaseRef
-addArtist' :: NewArtist -> Connection -> IO (Maybe Artist)
-addArtist' (NewArtist name) conn = do
-    newID <- getNewArtistID $ conn
-    run conn "INSERT INTO artists (id, name) VALUES (?, ?);" [convert newID, convert name]
-    commit conn
-    Just <$> getArtist' (Id newID) conn
+addArtist' :: NewArtist -> DBIO (Maybe Artist)
+addArtist' (NewArtist name) = do
+    newID <- getNewArtistID
+    runDB "INSERT INTO artists (id, name) VALUES (?, ?);" [convert newID, convert name]
+    commitDB
+    Just <$> getArtist' (Id newID)
 
 -- Returns an Integer that is not currently used as an ArtistID
-getNewArtistID :: Connection -> IO Integer
-getNewArtistID conn = do
-    r <- quickQuery' conn "SELECT artist_id FROM last_ids" []
-    let [[oldID]] = r
-    let newID = (convert oldID) + 1;
-    run conn "UPDATE last_ids SET artist_id=?" [convert newID]
-    return newID
+getNewArtistID :: DBIO Integer
+getNewArtistID = do
+  [[oldID]] <- queryDB' "SELECT artist_id FROM last_ids" []
+  let newID = (convert oldID) + 1;
+  runDB "UPDATE last_ids SET artist_id=?" [convert newID]
+  return newID
 
 -- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums :: Text -> DatabaseRef -> IO [Album]
-findAlbums title db = withDatabase db $ findAlbum' title
+findAlbums title db = withDatabase db $ findAlbums' title
 
--- Like findAlbums, but expects a Connection rather than a DatabaseRef
-findAlbum' :: Text -> Connection -> IO [Album]
-findAlbum' title conn = do
-    r <- quickQuery' conn "SELECT id FROM albums WHERE title = ?;" [convert title]
+findAlbums' :: Text -> DBIO [Album]
+findAlbums' title = do
+    r <- queryDB' "SELECT id FROM albums WHERE title = ?;" [convert title]
     forM r $ \x ->
-      getAlbum' (convert1 x) conn
+      getAlbum' (convert1 x)
 
 -- |Given an AlbumID, retrieve the corresponding Album record from the database.
 getAlbum :: AlbumID -> DatabaseRef -> IO Album
 getAlbum a db = withDatabase db $ getAlbum' a
 
--- Like getAlbum, but expects a Connection rather than a DatabaseRef
-getAlbum' :: AlbumID -> Connection -> IO Album
-getAlbum' albumID conn = do
-    r <- quickQuery' conn "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
+getAlbum' :: AlbumID -> DBIO Album
+getAlbum' albumID = do
+    r <- queryDB' "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
     let (title, artistID, numTracks) = convert3 $ head r
-    artist <- getArtist' artistID conn
+    artist <- getArtist' artistID
     return $ Album albumID title artist numTracks
 
 -- |An album which may not yet have been added to the database
@@ -340,33 +351,31 @@ data NewAlbum = NewAlbum Title ArtistID TrackCount
 addAlbum :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
 addAlbum a db = withDatabase db $ addAlbum' a
 
-getNewAlbumID :: Connection -> IO AlbumID
-getNewAlbumID conn = do
-    r <- quickQuery' conn "SELECT album_id FROM last_ids" []
-    let [[oldID]] = r
+getNewAlbumID :: DBIO AlbumID
+getNewAlbumID = do
+    [[oldID]] <- queryDB' "SELECT album_id FROM last_ids" []
     let newID = (convert oldID) + 1
-    run conn "UPDATE last_ids SET album_id=?;" [convert newID]
+    runDB "UPDATE last_ids SET album_id=?;" [convert newID]
     return $ Id newID
 
-addAlbum' :: NewAlbum -> Connection -> IO (Maybe Album)
-addAlbum' (NewAlbum title artistID trackCount) conn = do
-    newID <- getNewAlbumID conn
-    run conn "INSERT INTO albums (id, title, artist, num_tracks) VALUES (?, ?, ?, ?);"
-        [convert newID, convert title, convert artistID, convert trackCount]
-    commit conn
-    Just <$> getAlbum' newID conn
+addAlbum' :: NewAlbum -> DBIO (Maybe Album)
+addAlbum' (NewAlbum title artistID trackCount) = do
+    newID <- getNewAlbumID
+    runDB "INSERT INTO albums (id, title, artist, num_tracks) VALUES (?, ?, ?, ?);"
+          [convert newID, convert title, convert artistID, convert trackCount]
+    commitDB
+    Just <$> getAlbum' newID 
 
 -- |Given a RecordingID, retrieve the corresponding Recording from the database.
 getRecording :: RecordingID -> DatabaseRef -> IO Recording
 getRecording r db = withDatabase db $ getRecording' r
 
--- Like getRecording, but expects a Connection rather than a DatabaseRef
-getRecording' :: RecordingID -> Connection -> IO Recording
-getRecording' recordingID conn = do
-    r <- quickQuery' conn "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
+getRecording' :: RecordingID -> DBIO Recording
+getRecording' recordingID = do
+    r <- queryDB' "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
     let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
-    artist <- getArtist' artistID conn
-    album <- getAlbum' albumID conn
+    artist <- getArtist' artistID
+    album <- getAlbum' albumID
     return $ Recording recordingID file title artist album trackNumber
 
 -- |A recording which may not yet have been added to the database
@@ -376,20 +385,20 @@ data NewRecording = NewRecording FileName Title ArtistID AlbumID TrackNumber
 addRecording :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
 addRecording r db = withDatabase db $ addRecording' r
 
-getNewRecordingID conn = do
-    r <- quickQuery' conn "SELECT recording_id FROM last_ids" []
-    let [[oldID]] = r
+getNewRecordingID :: DBIO Integer
+getNewRecordingID = do
+    [[oldID]] <- queryDB' "SELECT recording_id FROM last_ids" []
     let newID = (convert oldID) + 1
-    run conn "UPDATE last_ids SET artist_id=?;" [convert newID]
-    return $ Id newID
+    runDB "UPDATE last_ids SET artist_id=?;" [convert newID]
+    return newID
 
-addRecording' :: NewRecording -> Connection -> IO (Maybe Recording)
-addRecording' (NewRecording filename title artistID albumID trackNumber) conn = do
-    newID <- getNewRecordingID conn
-    run conn "INSERT INTO recordings (id, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?);"
+addRecording' :: NewRecording -> DBIO (Maybe Recording)
+addRecording' (NewRecording filename title artistID albumID trackNumber) = do
+    newID <- Id <$> getNewRecordingID
+    runDB "INSERT INTO recordings (id, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?);"
         [convert newID, convert filename, convert title, convert artistID, convert albumID, convert trackNumber]
-    commit conn
-    Just <$> getRecording' newID conn
+    commitDB
+    Just <$> getRecording' newID
 
 
 
