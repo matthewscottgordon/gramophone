@@ -280,11 +280,12 @@ commitDB = do
   conn <- ask
   liftIO $ commit conn
 
+wrapDB :: ( a -> DBIO b ) -> a -> DatabaseRef -> IO b
+wrapDB f = \v -> \db -> withDatabase db $ f v
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
 findArtists :: Text -> DatabaseRef -> IO [Artist]
-findArtists name db = withDatabase db $ findArtists' name
-
+findArtists = wrapDB findArtists'
 
 findArtists' :: Text -> DBIO [Artist]
 findArtists' name = do
@@ -294,7 +295,7 @@ findArtists' name = do
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
 getArtist :: ArtistID -> DatabaseRef -> IO Artist
-getArtist a db = withDatabase db $ getArtist' a
+getArtist = wrapDB getArtist'
 
 getArtist' :: ArtistID -> DBIO Artist
 getArtist' (Id i) = do
@@ -306,7 +307,7 @@ data NewArtist = NewArtist Name
 
 -- |Add a new Artist to the Database. If successful, returns the new Artist record.
 addArtist :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
-addArtist a db = withDatabase db $ addArtist' a
+addArtist = wrapDB addArtist'
 
 addArtist' :: NewArtist -> DBIO (Maybe Artist)
 addArtist' (NewArtist name) = do
@@ -325,7 +326,7 @@ getNewArtistID = do
 
 -- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums :: Text -> DatabaseRef -> IO [Album]
-findAlbums title db = withDatabase db $ findAlbums' title
+findAlbums = wrapDB findAlbums'
 
 findAlbums' :: Text -> DBIO [Album]
 findAlbums' title = do
@@ -335,7 +336,7 @@ findAlbums' title = do
 
 -- |Given an AlbumID, retrieve the corresponding Album record from the database.
 getAlbum :: AlbumID -> DatabaseRef -> IO Album
-getAlbum a db = withDatabase db $ getAlbum' a
+getAlbum = wrapDB getAlbum'
 
 getAlbum' :: AlbumID -> DBIO Album
 getAlbum' albumID = do
@@ -349,7 +350,7 @@ data NewAlbum = NewAlbum Title ArtistID TrackCount
 
 -- |Add a new Album to the database. If successful, returns the new Album record.
 addAlbum :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
-addAlbum a db = withDatabase db $ addAlbum' a
+addAlbum = wrapDB addAlbum'
 
 getNewAlbumID :: DBIO AlbumID
 getNewAlbumID = do
@@ -368,7 +369,7 @@ addAlbum' (NewAlbum title artistID trackCount) = do
 
 -- |Given a RecordingID, retrieve the corresponding Recording from the database.
 getRecording :: RecordingID -> DatabaseRef -> IO Recording
-getRecording r db = withDatabase db $ getRecording' r
+getRecording = wrapDB getRecording'
 
 getRecording' :: RecordingID -> DBIO Recording
 getRecording' recordingID = do
@@ -383,7 +384,7 @@ data NewRecording = NewRecording FileName Title ArtistID AlbumID TrackNumber
 
 -- |Add a new recording to the database. If successful, returns the new Recording record.
 addRecording :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
-addRecording r db = withDatabase db $ addRecording' r
+addRecording = wrapDB addRecording'
 
 getNewRecordingID :: DBIO Integer
 getNewRecordingID = do
