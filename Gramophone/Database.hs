@@ -44,6 +44,7 @@ import Database.HDBC
 
 import Control.Monad
 import Control.Monad.Reader
+import Control.Error
 import Data.Functor
 
 import Data.Convertible
@@ -155,6 +156,12 @@ convert6 :: Convertible a b => Convertible a c => Convertible a d => Convertible
 convert6 (a:b:c:d:e:f:_) = (convert a, convert b, convert c, convert d, convert e, convert f)
 
 
+databaseMagic :: Text
+databaseMagic = "Gramophone"
+databaseCurrentVersion :: Integer
+databaseCurrentVersion = 0
+
+
 -- |Opaque type refering to a database.
 -- Some safety is provided by the fact that the type constructor is not exported—for a caller to get
 -- a DatabaseRef, they must call getDatabaseRef which first checks that the database exists and creates
@@ -167,8 +174,11 @@ printSqlError e = putStrLn $ show e
 
 -- |Error values returned by openDatabase
 data OpenError
-    = OpenDoesNotExistError -- ^ The given filename does not exist
-    | OpenFileError String  -- ^ File exists but could not be opened. String is HDBC error message.
+    = OpenDoesNotExistError        -- ^ The given filename does not exist
+    | OpenBadFormatError String    -- ^ The database schema is not recognized
+    | OpenOldFormatError Integer   -- ^ The database is in an old format and must be migrated before use
+    | OpenNewerFormatError Integer -- ^ The database format is newer than this version of Gramophone
+    | OpenFileError String         -- ^ File exists but could not be opened. String is HDBC error message.
     deriving (Show, Eq)
 
 -- |Opens a database.
@@ -177,15 +187,52 @@ openDatabase filename = do
   fileExists <- doesFileExist filename
   if fileExists 
     then
-      catchSql checkDatabase $ \e -> return $ Left $ OpenFileError $ show e
+      checkDatabase filename
     else
       return $ Left OpenDoesNotExistError
+--  where
+--    checkDatabase = do
+--        conn <- Sqlite.connectSqlite3 filename
+--        
+--        disconnect conn
+--        return $ Right $ DatabaseRef filename
+
+catchSql' :: (IO a) -> (SqlError -> IO b) -> (EitherT b IO a)
+catchSql' f handler = do
+    r <- liftIO $ catchSql (Right <$> f) (wrapLeft handler)
+    case r of
+      Right v -> return v
+      Left e  -> left e
   where
-    checkDatabase = do
-        conn <- Sqlite.connectSqlite3 filename
-        -- Eventually, code for checking schema goes here.
-        disconnect conn
-        return $ Right $ DatabaseRef filename
+    wrapLeft h e = do
+      r <- h e
+      return $ Left r
+  
+  
+checkDatabase :: FilePath -> IO (Either OpenError DatabaseRef)
+checkDatabase filepath = runEitherT $ do
+  conn <- catchSql' (Sqlite.connectSqlite3 filepath) (\e -> return $ OpenFileError $ show e)
+  magic <- catchSql' (getMagic conn) (\e -> return $ OpenBadFormatError $ show e)
+  unless (magic == databaseMagic) $ left (OpenBadFormatError "Unrecognized Magic")
+  version <- catchSql' (getVersion conn) (\e -> return $ OpenBadFormatError $ show e)
+  when (version < databaseCurrentVersion) $ left (OpenOldFormatError version)
+  when (version > databaseCurrentVersion) $ left (OpenNewerFormatError version)
+  liftIO $ disconnect conn
+  return $ DatabaseRef filepath
+
+getMagic :: Sqlite.Connection -> IO Text
+getMagic conn = do
+  r <- quickQuery' conn "SELECT magic FROM database_info;" []
+  if (length r /= 1)
+    then
+      return ""
+    else
+      return $ convert $ head $ head r
+
+getVersion :: Sqlite.Connection -> IO Integer
+getVersion conn = do
+  (convert . head . head) <$> quickQuery' conn "SELECT version FROM database_info;" []
+
 
 -- | Error values returned by createDatabase
 data CreateError
@@ -216,13 +263,14 @@ initSchema conn = do
   run conn
       "CREATE TABLE recordings (\n\
        \        id                  INTEGER PRIMARY KEY,\n\
-       \        file                VARCHAR(1024),\n\
+       \        file                VARCHAR(1024) NOT NULL UNIQUE,\n\
        \        title               VARCHAR(256),\n\
        \        artist              INTEGER,\n\
        \        album               INTEGER,\n\
        \        track_number        INTEGER,\n\
        \        FOREIGN KEY(album)  REFERENCES albums(id),\n\
-       \        FOREIGN KEY(artist) REFERENCES artists(id)\n\
+       \        FOREIGN KEY(artist) REFERENCES artists(id),\n\
+       \        UNIQUE(album,track_number)\n\
        \    );\n"
        []
   run conn
@@ -236,18 +284,21 @@ initSchema conn = do
        []
   run conn
       "CREATE TABLE artists (\n\
-      \         id                  INTEGER,\n\
+      \         id                  INTEGER PRIMARY KEY,\n\
       \         name                VARCHAR(1024)\n\
       \    );\n"
       []
   run conn
       "CREATE TABLE last_ids (\n\
-      \         recording_id  INTEGER,\n\
+      \         recording_id  INTEGER PRIMARY KEY,\n\
       \         album_id      INTEGER,\n\
       \         artist_id     INTEGER\n\
       \    );\n"
       []
   run conn "INSERT INTO last_ids (recording_id, album_id, artist_id) VALUES (0, 0, 0);" []
+  run conn "CREATE TABLE database_info ( magic CHARACTER(10) NOT NULL, version INTEGER NOT NULL );" []
+  run conn "INSERT INTO database_info ( magic, version ) VALUES (?,?);"
+          [convert databaseMagic, convert databaseCurrentVersion]
   commit conn
 
 
