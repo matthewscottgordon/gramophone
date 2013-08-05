@@ -9,7 +9,7 @@ module Gramophone.Database
      createDatabase,
      CreateError(..),
 
-     FileName,
+     AudioFileName,
      Title,
      TrackNumber,
      TrackCount,
@@ -60,12 +60,12 @@ data Id a = Id Integer
 type RecordingID = Id Recording
 
 -- |The name of an audio file
-newtype FileName = FileName Text
+newtype AudioFileName = AudioFileName Text
     deriving Show
-instance Convertible SqlValue FileName where
-    safeConvert = (fmap FileName) . safeConvert
-instance Convertible FileName SqlValue where
-     safeConvert (FileName a) = safeConvert a
+instance Convertible SqlValue AudioFileName where
+    safeConvert = (fmap AudioFileName) . safeConvert
+instance Convertible AudioFileName SqlValue where
+     safeConvert (AudioFileName a) = safeConvert a
 
 -- |The title of a recording or album
 newtype Title = Title Text
@@ -102,7 +102,7 @@ instance Convertible TrackCount SqlValue where
 -- |Record describing an audio file
 data Recording = Recording {
      recordingId          :: RecordingID,
-     recordingFile        :: FileName,
+     recordingFile        :: AudioFileName,
      recordingTitle       :: Title,
      recordingArtist      :: Artist,
      recordingAlbum       :: Album,
@@ -431,7 +431,7 @@ getRecording' recordingID = do
     return $ Recording recordingID file title artist album trackNumber
 
 -- |A recording which may not yet have been added to the database
-data NewRecording = NewRecording FileName Title ArtistID AlbumID TrackNumber
+data NewRecording = NewRecording AudioFileName Title ArtistID AlbumID TrackNumber
 
 -- |Add a new recording to the database. If successful, returns the new Recording record.
 addRecording :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
