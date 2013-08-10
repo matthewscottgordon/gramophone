@@ -24,6 +24,8 @@ import qualified System.FilePath.Glob as Glob
 
 import Control.Monad
 import Control.Applicative
+import Control.Monad.IO.Class
+import Control.Monad.Trans.State.Strict
 
 
 -- | Given a directory, initializes a database and any other files used
@@ -40,12 +42,36 @@ audioFileGlobs = map Glob.compile ["*.flac", "*.mp3", "*.m4a"]
 scanDirectoryForAudioFiles :: FilePath -> IO [FilePath]
 scanDirectoryForAudioFiles = (return . concat . fst) <=< (Glob.globDir audioFileGlobs)
 
-scanTreeForAudioFiles :: FilePath -> IO [FilePath]
-scanTreeForAudioFiles dir = do tree <- getTree dir
-                               concat <$> mapM scanDirectoryForAudioFiles tree
-                            where
-                              getTree d = do
-                                contents <- (filter (`notElem` [".", ".."])) <$> getDirectoryContents d
-                                subDirs <- filterM doesDirectoryExist $ map (FilePath.combine d) contents
-                                subSubDirs <- concat <$> mapM getTree subDirs
-                                return $ d : subSubDirs
+data ScanState = ScanState {
+              unscannedDirectories :: [FilePath],
+              unscannedFiles       :: [FilePath]
+            } deriving Show
+
+scanTreeForAudioFiles :: FilePath -> StateT ScanState IO () -> IO ()
+scanTreeForAudioFiles dir f = evalStateT f $ ScanState [dir] []
+
+data ScanResult = FoundFile FilePath | ScanningDirectory FilePath | ScanDone
+getNextFile :: StateT ScanState IO ScanResult
+getNextFile = do
+  scanState <- get
+  case scanState of
+    ScanState [] [] -> return ScanDone
+    ScanState dirs (file:files) -> do
+      put $ ScanState dirs files
+      return $ FoundFile file
+    ScanState (dir:dirs) [] -> do
+      contents <- liftIO $ (filter (`notElem` [",",".."])) <$> getDirectoryContents dir
+      subDirs <- liftIO $ filterM doesDirectoryExist $ map (FilePath.combine dir) contents
+      files <- liftIO $ scanDirectoryForAudioFiles dir
+      put $ ScanState (subDirs++dirs) files
+      return $ScanningDirectory dir
+
+--scanTreeForAudioFiles :: FilePath -> IO [FilePath]
+--scanTreeForAudioFiles dir = do tree <- getTree dir
+--                               concat <$> mapM scanDirectoryForAudioFiles tree
+--                            where
+--                              getTree d = do
+--                                contents <- (filter (`notElem` [".", ".."])) <$> getDirectoryContents d
+--                                subDirs <- filterM doesDirectoryExist $ map (FilePath.combine d) contents
+--                                subSubDirs <- concat <$> mapM getTree subDirs
+--                                return $ d : subSubDirs
