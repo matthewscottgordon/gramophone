@@ -66,12 +66,3 @@ getNextFile = do
       put $ ScanState (subDirs++dirs) files
       return $ScanningDirectory dir
 
---scanTreeForAudioFiles :: FilePath -> IO [FilePath]
---scanTreeForAudioFiles dir = do tree <- getTree dir
---                               concat <$> mapM scanDirectoryForAudioFiles tree
---                            where
---                              getTree d = do
---                                contents <- (filter (`notElem` [".", ".."])) <$> getDirectoryContents d
---                                subDirs <- filterM doesDirectoryExist $ map (FilePath.combine d) contents
---                                subSubDirs <- concat <$> mapM getTree subDirs
---                                return $ d : subSubDirs
