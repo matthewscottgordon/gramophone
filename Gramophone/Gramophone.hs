@@ -60,7 +60,7 @@ getNextFile = do
       put $ ScanState dirs files
       return $ FoundFile file
     ScanState (dir:dirs) [] -> do
-      contents <- liftIO $ (filter (`notElem` [",",".."])) <$> getDirectoryContents dir
+      contents <- liftIO $ (filter (`notElem` [".",".."])) <$> getDirectoryContents dir
       subDirs <- liftIO $ filterM doesDirectoryExist $ map (FilePath.combine dir) contents
       files <- liftIO $ scanDirectoryForAudioFiles dir
       put $ ScanState (subDirs++dirs) files
