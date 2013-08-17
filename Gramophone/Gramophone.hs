@@ -42,6 +42,21 @@ audioFileGlobs = map Glob.compile ["*.flac", "*.mp3", "*.m4a"]
 scanDirectoryForAudioFiles :: FilePath -> IO [FilePath]
 scanDirectoryForAudioFiles = (return . concat . fst) <=< (Glob.globDir audioFileGlobs)
 
+
+printAudioFilenames :: FilePath -> IO ()
+printAudioFilenames dir = scanTreeForAudioFiles dir loop
+    where loop = do
+            p <- getNextFile
+            case p of
+              FoundFile filename -> do
+                     liftIO $ putStrLn ("File: " ++ filename)
+                     loop
+              ScanningDirectory dirName -> do
+                     liftIO $ putStr ("Scanning: " ++ dirName ++ "\r")
+                     loop
+              ScanDone -> return ()
+                     
+
 data ScanState = ScanState {
               unscannedDirectories :: [FilePath],
               unscannedFiles       :: [FilePath]
