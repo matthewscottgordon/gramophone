@@ -15,6 +15,8 @@ module Gramophone.Database
      TrackCount,
      Name,
 
+     DBIO(),
+
      Artist(..),
      ArtistID(),
      findArtists,
@@ -33,7 +35,7 @@ module Gramophone.Database
      RecordingID(),
      getRecording,
      NewRecording(..),
-     addRecording
+     addRecording,
     ) where
 
 import qualified Data.Text as T
@@ -315,8 +317,8 @@ withDatabase (DatabaseRef filename) action = do
   return r
 
 
-queryDB' :: String -> [SqlValue] -> DBIO [[SqlValue]]
-queryDB' sql values = do
+queryDB :: String -> [SqlValue] -> DBIO [[SqlValue]]
+queryDB sql values = do
   conn <- ask
   liftIO $ quickQuery' conn sql values
 
@@ -335,122 +337,122 @@ wrapDB :: ( a -> DBIO b ) -> a -> DatabaseRef -> IO b
 wrapDB f = \v -> \db -> withDatabase db $ f v
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
-findArtists :: Text -> DatabaseRef -> IO [Artist]
-findArtists = wrapDB findArtists'
+findArtists' :: Text -> DatabaseRef -> IO [Artist]
+findArtists' = wrapDB findArtists
 
-findArtists' :: Text -> DBIO [Artist]
-findArtists' name = do
-    r <- queryDB' "SELECT id, name FROM artists WHERE name = ?;" [convert name]
+findArtists :: Text -> DBIO [Artist]
+findArtists name = do
+    r <- queryDB "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
   where artistFromSql (idValue:nameValue:[]) = Artist (Id (convert idValue)) (convert nameValue)
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
-getArtist :: ArtistID -> DatabaseRef -> IO Artist
-getArtist = wrapDB getArtist'
+getArtist' :: ArtistID -> DatabaseRef -> IO Artist
+getArtist' = wrapDB getArtist
 
-getArtist' :: ArtistID -> DBIO Artist
-getArtist' (Id i) = do
-  [[name]] <- queryDB' "SELECT name FROM artists WHERE id = ?;" [convert i]
+getArtist :: ArtistID -> DBIO Artist
+getArtist (Id i) = do
+  [[name]] <- queryDB "SELECT name FROM artists WHERE id = ?;" [convert i]
   return $ Artist (Id i) (convert name)
 
 -- |An artist which may not yet have been added to the database.
 data NewArtist = NewArtist Name
 
 -- |Add a new Artist to the Database. If successful, returns the new Artist record.
-addArtist :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
-addArtist = wrapDB addArtist'
+addArtist' :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
+addArtist' = wrapDB addArtist
 
-addArtist' :: NewArtist -> DBIO (Maybe Artist)
-addArtist' (NewArtist name) = do
+addArtist :: NewArtist -> DBIO (Maybe Artist)
+addArtist (NewArtist name) = do
     newID <- getNewArtistID
     runDB "INSERT INTO artists (id, name) VALUES (?, ?);" [convert newID, convert name]
     commitDB
-    Just <$> getArtist' (Id newID)
+    Just <$> getArtist (Id newID)
 
 -- Returns an Integer that is not currently used as an ArtistID
 getNewArtistID :: DBIO Integer
 getNewArtistID = do
-  [[oldID]] <- queryDB' "SELECT artist_id FROM last_ids" []
+  [[oldID]] <- queryDB "SELECT artist_id FROM last_ids" []
   let newID = (convert oldID) + 1;
   runDB "UPDATE last_ids SET artist_id=?" [convert newID]
   return newID
 
 -- |Given the name of an Album, returns a list of all Album records that have that name.
-findAlbums :: Text -> DatabaseRef -> IO [Album]
-findAlbums = wrapDB findAlbums'
+findAlbums' :: Text -> DatabaseRef -> IO [Album]
+findAlbums' = wrapDB findAlbums
 
-findAlbums' :: Text -> DBIO [Album]
-findAlbums' title = do
-    r <- queryDB' "SELECT id FROM albums WHERE title = ?;" [convert title]
+findAlbums :: Text -> DBIO [Album]
+findAlbums title = do
+    r <- queryDB "SELECT id FROM albums WHERE title = ?;" [convert title]
     forM r $ \x ->
-      getAlbum' (convert1 x)
+      getAlbum (convert1 x)
 
 -- |Given an AlbumID, retrieve the corresponding Album record from the database.
-getAlbum :: AlbumID -> DatabaseRef -> IO Album
-getAlbum = wrapDB getAlbum'
+getAlbum' :: AlbumID -> DatabaseRef -> IO Album
+getAlbum' = wrapDB getAlbum
 
-getAlbum' :: AlbumID -> DBIO Album
-getAlbum' albumID = do
-    r <- queryDB' "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
+getAlbum :: AlbumID -> DBIO Album
+getAlbum albumID = do
+    r <- queryDB "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
     let (title, artistID, numTracks) = convert3 $ head r
-    artist <- getArtist' artistID
+    artist <- getArtist artistID
     return $ Album albumID title artist numTracks
 
 -- |An album which may not yet have been added to the database
 data NewAlbum = NewAlbum Title ArtistID TrackCount
 
 -- |Add a new Album to the database. If successful, returns the new Album record.
-addAlbum :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
-addAlbum = wrapDB addAlbum'
+addAlbum' :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
+addAlbum' = wrapDB addAlbum
 
 getNewAlbumID :: DBIO AlbumID
 getNewAlbumID = do
-    [[oldID]] <- queryDB' "SELECT album_id FROM last_ids" []
+    [[oldID]] <- queryDB "SELECT album_id FROM last_ids" []
     let newID = (convert oldID) + 1
     runDB "UPDATE last_ids SET album_id=?;" [convert newID]
     return $ Id newID
 
-addAlbum' :: NewAlbum -> DBIO (Maybe Album)
-addAlbum' (NewAlbum title artistID trackCount) = do
+addAlbum :: NewAlbum -> DBIO (Maybe Album)
+addAlbum (NewAlbum title artistID trackCount) = do
     newID <- getNewAlbumID
     runDB "INSERT INTO albums (id, title, artist, num_tracks) VALUES (?, ?, ?, ?);"
           [convert newID, convert title, convert artistID, convert trackCount]
     commitDB
-    Just <$> getAlbum' newID 
+    Just <$> getAlbum newID 
 
 -- |Given a RecordingID, retrieve the corresponding Recording from the database.
-getRecording :: RecordingID -> DatabaseRef -> IO Recording
-getRecording = wrapDB getRecording'
+getRecording' :: RecordingID -> DatabaseRef -> IO Recording
+getRecording' = wrapDB getRecording
 
-getRecording' :: RecordingID -> DBIO Recording
-getRecording' recordingID = do
-    r <- queryDB' "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
+getRecording :: RecordingID -> DBIO Recording
+getRecording recordingID = do
+    r <- queryDB "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
     let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
-    artist <- getArtist' artistID
-    album <- getAlbum' albumID
+    artist <- getArtist artistID
+    album <- getAlbum albumID
     return $ Recording recordingID file title artist album trackNumber
 
 -- |A recording which may not yet have been added to the database
 data NewRecording = NewRecording AudioFileName Title ArtistID AlbumID TrackNumber
 
 -- |Add a new recording to the database. If successful, returns the new Recording record.
-addRecording :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
-addRecording = wrapDB addRecording'
+addRecording' :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
+addRecording' = wrapDB addRecording
 
 getNewRecordingID :: DBIO Integer
 getNewRecordingID = do
-    [[oldID]] <- queryDB' "SELECT recording_id FROM last_ids" []
+    [[oldID]] <- queryDB "SELECT recording_id FROM last_ids" []
     let newID = (convert oldID) + 1
     runDB "UPDATE last_ids SET artist_id=?;" [convert newID]
     return newID
 
-addRecording' :: NewRecording -> DBIO (Maybe Recording)
-addRecording' (NewRecording filename title artistID albumID trackNumber) = do
+addRecording :: NewRecording -> DBIO (Maybe Recording)
+addRecording (NewRecording filename title artistID albumID trackNumber) = do
     newID <- Id <$> getNewRecordingID
     runDB "INSERT INTO recordings (id, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?);"
         [convert newID, convert filename, convert title, convert artistID, convert albumID, convert trackNumber]
     commitDB
-    Just <$> getRecording' newID
+    Just <$> getRecording newID
 
 
 
