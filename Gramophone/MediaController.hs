@@ -1,3 +1,5 @@
+{-# LANGUAGE  OverloadedStrings, TemplateHaskell #-}
+
 module Gramophone.MediaController
     (
      Tags(..),
@@ -5,7 +7,8 @@ module Gramophone.MediaController
      readTagsFromFile,
     ) where
 
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>),(<|>))
+import Control.Lens
 
 import qualified Media.Streaming.GStreamer as GS
 import qualified System.Glib.GError as GLib
@@ -13,14 +16,19 @@ import qualified System.Glib.Properties as GLib
 import qualified System.Glib.Signals as GLib
 
 data Tags = Tags {
-      tagTrackName :: Maybe String,
-      tagAlbumName :: Maybe String,
-      tagArtistName :: Maybe String,
-      tagTrackNumber :: Maybe Integer,
-      tagNumTracks :: Maybe Integer,
-      tagDiscNumber :: Maybe Integer,
-      tagNumDiscs :: Maybe Integer
+      _tagTrackName :: Maybe String,
+      _tagAlbumName :: Maybe String,
+      _tagArtistName :: Maybe String,
+      _tagTrackNumber :: Maybe Integer,
+      _tagNumTracks :: Maybe Integer,
+      _tagDiscNumber :: Maybe Integer,
+      _tagNumDiscs :: Maybe Integer
 }
+
+$(makeLenses ''Tags)
+
+modifyTag l v = l `over` (<|> v)
+
 
 instance Show Tags where
     show (Tags maybeTrackName maybeAlbumName maybeArtistName maybeTrackNumber maybeNumTracks maybeDiscNumber maybeNumDiscs) =
@@ -104,18 +112,21 @@ getTags bus = loop (Tags Nothing Nothing Nothing Nothing Nothing Nothing Nothing
                                                          return (Left "Uknown Error")
                             GS.MessageTag       -> do
                               case (GS.messageParseTag message) of
-                                Just tagList -> loop (parseTags tags tagList)
+                                Just tagList -> loop (parseTags tagList tags)
                                 Nothing      -> return (Right tags)
                             _                   -> loop tags
           Nothing -> return (Right tags)
 
-    parseTags tags tagList =
-        tags { tagTrackName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle) }
-             { tagAlbumName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagAlbum) }
-             { tagArtistName = GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagArtist) }
-             { tagTrackNumber = fromIntegral <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagTrackNumber) }
-             { tagNumTracks = fromIntegral <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagTrackCount) }
-             { tagDiscNumber = fromIntegral <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagAlbumVolumeNumber)}
-             { tagNumDiscs = fromIntegral <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagVolumeCount) }
+    parseTags tagList = (modifyTag tagTrackName (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle)))
+             . (modifyTag tagAlbumName (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagAlbum)))
+             . (modifyTag tagArtistName (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagArtist)))
+             . (modifyTag tagTrackNumber $ fromIntegral
+                                          <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagTrackNumber))
+             . (modifyTag tagNumTracks $ fromIntegral
+                                        <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagTrackCount))
+             . (modifyTag tagDiscNumber $ fromIntegral
+                                         <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagAlbumVolumeNumber))
+             . (modifyTag tagNumDiscs $ fromIntegral
+                                       <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagVolumeCount))
 
 
