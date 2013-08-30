@@ -16,6 +16,7 @@ module Gramophone.Database
      Name,
 
      DBIO(),
+     withDatabase,
 
      Artist(..),
      ArtistID(),
