@@ -41,7 +41,7 @@ instance Show Tags where
                      (maybeLine "Disc Count:  " maybeNumDiscs)
                    where
                      maybeLine label (Just value) = label ++ (show value) ++ "\n"
-                     maybeLine label Nothing      = ""
+                     maybeLine _     Nothing      = ""
 
 initMediaController :: IO ()
 initMediaController = do
@@ -117,16 +117,16 @@ getTags bus = loop (Tags Nothing Nothing Nothing Nothing Nothing Nothing Nothing
                             _                   -> loop tags
           Nothing -> return (Right tags)
 
-    parseTags tagList = (modifyTag tagTrackName (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagTitle)))
-             . (modifyTag tagAlbumName (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagAlbum)))
-             . (modifyTag tagArtistName (GS.tagListGetString tagList (GS.standardTagToString GS.StandardTagArtist)))
-             . (modifyTag tagTrackNumber $ fromIntegral
-                                          <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagTrackNumber))
-             . (modifyTag tagNumTracks $ fromIntegral
-                                        <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagTrackCount))
-             . (modifyTag tagDiscNumber $ fromIntegral
-                                         <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagAlbumVolumeNumber))
-             . (modifyTag tagNumDiscs $ fromIntegral
-                                       <$> GS.tagListGetUInt tagList (GS.standardTagToString GS.StandardTagVolumeCount))
+    parseTags tagList = (checkTag tagTrackName (parseString GS.StandardTagTitle))
+             . (checkTag tagAlbumName (parseString GS.StandardTagAlbum))
+             . (checkTag tagArtistName (parseString GS.StandardTagArtist))
+             . (checkTag tagTrackNumber (parseUInt GS.StandardTagTrackNumber))
+             . (checkTag tagNumTracks (parseUInt GS.StandardTagTrackCount))
+             . (checkTag tagDiscNumber (parseUInt GS.StandardTagAlbumVolumeNumber))
+             . (checkTag tagNumDiscs (parseUInt GS.StandardTagVolumeCount))
+         where
+           checkTag field parseFunc = modifyTag field (parseFunc tagList)
+           parseString t l = GS.tagListGetString l (GS.standardTagToString t)
+           parseUInt t l = fromIntegral <$> GS.tagListGetUInt l (GS.standardTagToString t)
 
 
