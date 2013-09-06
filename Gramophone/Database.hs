@@ -49,6 +49,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Error
 import Data.Functor
+import qualified Data.Traversable
 
 import Data.Convertible
 
@@ -336,6 +337,11 @@ commitDB = do
 
 wrapDB :: ( a -> DBIO b ) -> a -> DatabaseRef -> IO b
 wrapDB f = \v -> \db -> withDatabase db $ f v
+
+overMaybe :: Monad m => Functor m =>  (a -> m b) -> Maybe a -> m (Maybe b)
+overMaybe = Data.Traversable.mapM
+--overMaybe _ Nothing  = return Nothing
+--overMaybe f (Just v) = Just <$> f v
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
 findArtists' :: Text -> DatabaseRef -> IO [Artist]
