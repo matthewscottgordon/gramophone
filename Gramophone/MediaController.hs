@@ -17,6 +17,7 @@ module Gramophone.MediaController
 
 import Control.Applicative ((<$>),(<|>))
 import Control.Lens
+import Data.Text
 
 import qualified Media.Streaming.GStreamer as GS
 import qualified System.Glib.GError as GLib
@@ -24,9 +25,9 @@ import qualified System.Glib.Properties as GLib
 import qualified System.Glib.Signals as GLib
 
 data Tags = Tags {
-      _tagTrackName :: Maybe String,
-      _tagAlbumName :: Maybe String,
-      _tagArtistName :: Maybe String,
+      _tagTrackName :: Maybe Text,
+      _tagAlbumName :: Maybe Text,
+      _tagArtistName :: Maybe Text,
       _tagTrackNumber :: Maybe Integer,
       _tagNumTracks :: Maybe Integer,
       _tagDiscNumber :: Maybe Integer,
@@ -134,7 +135,7 @@ getTags bus = loop (Tags Nothing Nothing Nothing Nothing Nothing Nothing Nothing
              . (checkTag tagNumDiscs (parseUInt GS.StandardTagVolumeCount))
          where
            checkTag field parseFunc = modifyTag field (parseFunc tagList)
-           parseString t l = GS.tagListGetString l (GS.standardTagToString t)
+           parseString t l = pack <$> GS.tagListGetString l (GS.standardTagToString t)
            parseUInt t l = fromIntegral <$> GS.tagListGetUInt l (GS.standardTagToString t)
 
 
