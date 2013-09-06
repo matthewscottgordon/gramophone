@@ -2,7 +2,15 @@
 
 module Gramophone.MediaController
     (
-     Tags(..),
+     Tags(),
+     tagTrackName,
+     tagAlbumName,
+     tagArtistName,
+     tagTrackNumber,
+     tagNumTracks,
+     tagDiscNumber,
+     tagNumDiscs,
+
      initMediaController,
      readTagsFromFile,
     ) where
