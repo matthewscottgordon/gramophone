@@ -8,6 +8,8 @@ module Gramophone.Gramophone
      initFiles,
      scanDirectoryForAudioFiles,
      scanTreeForAudioFiles,
+     addFileToDatabase,
+     addAudioFilesFromTree,
 
      module Gramophone.Database
     ) where
@@ -25,7 +27,10 @@ import qualified System.FilePath.Glob as Glob
 import Control.Monad
 import Control.Applicative
 import Control.Monad.IO.Class
+import Control.Monad.Trans
 import Control.Monad.Trans.State.Strict
+
+import Control.Lens
 
 
 -- | Given a directory, initializes a database and any other files used
@@ -55,18 +60,54 @@ printAudioFilenames dir = scanTreeForAudioFiles dir loop
                      liftIO $ putStr ("Scanning: " ++ dirName ++ "\r")
                      loop
               ScanDone -> return ()
+
+
+addAudioFilesFromTree :: FilePath -> DBIO ()
+addAudioFilesFromTree dir = scanTreeForAudioFiles dir loop
+    where loop = do
+            p <- getNextFile
+            case p of
+              FoundFile filename -> do
+                     liftIO $ putStrLn ("File: " ++ filename)
+                     lift $ addFileToDatabase filename
+                     loop
+              ScanningDirectory dirName -> do
+                     liftIO $ putStr ("Scanning: " ++ dirName ++ "\r")
+                     loop
+              ScanDone -> return ()
+
+
+addFileToDatabase :: FilePath -> DBIO ()
+addFileToDatabase filename = do
+    maybeTags <- liftIO $ MC.readTagsFromFile filename
+    case maybeTags of
+      Nothing -> return ()
+      Just tags -> do
+        liftIO $ putStrLn ("File: " ++ filename)
+        recordingRelation <- addRecording (NewRecording (AudioFileName filename)
+                                                        (getRecordingTitleTag tags)
+                                                        Nothing
+                                                        Nothing
+                                                        (getTrackNumberTag tags))
+        return ()
                      
+
+getRecordingTitleTag :: MC.Tags -> Maybe RecordingTitle
+getRecordingTitleTag tags =  RecordingTitle <$> (view MC.tagTrackName tags)
+
+getTrackNumberTag :: MC.Tags -> Maybe TrackNumber
+getTrackNumberTag tags = TrackNumber <$> (view MC.tagTrackNumber tags)
 
 data ScanState = ScanState {
               unscannedDirectories :: [FilePath],
               unscannedFiles       :: [FilePath]
             } deriving Show
 
-scanTreeForAudioFiles :: FilePath -> StateT ScanState IO () -> IO ()
+scanTreeForAudioFiles :: MonadIO m => FilePath -> StateT ScanState m () -> m ()
 scanTreeForAudioFiles dir f = evalStateT f $ ScanState [dir] []
 
 data ScanResult = FoundFile FilePath | ScanningDirectory FilePath | ScanDone
-getNextFile :: StateT ScanState IO ScanResult
+getNextFile :: MonadIO m => StateT ScanState m ScanResult
 getNextFile = do
   scanState <- get
   case scanState of
