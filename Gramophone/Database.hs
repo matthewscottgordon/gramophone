@@ -10,7 +10,8 @@ module Gramophone.Database
      CreateError(..),
 
      AudioFileName(..),
-     Title,
+     RecordingTitle(..),
+     AlbumTitle(..),
      TrackNumber,
      TrackCount,
      Name,
@@ -71,13 +72,21 @@ instance Convertible SqlValue AudioFileName where
 instance Convertible AudioFileName SqlValue where
      safeConvert (AudioFileName a) = safeConvert a
 
--- |The title of a recording or album
-newtype Title = Title Text
+-- |The title of a recording
+newtype RecordingTitle = RecordingTitle Text
     deriving Show
-instance Convertible SqlValue Title where
-    safeConvert = (fmap Title) . safeConvert
-instance Convertible Title SqlValue where
-     safeConvert (Title a) = safeConvert a
+instance Convertible SqlValue RecordingTitle where
+    safeConvert = (fmap RecordingTitle) . safeConvert
+instance Convertible RecordingTitle SqlValue where
+     safeConvert (RecordingTitle a) = safeConvert a
+
+-- |The title of an album
+newtype AlbumTitle = AlbumTitle Text
+    deriving Show
+instance Convertible SqlValue AlbumTitle where
+    safeConvert = (fmap AlbumTitle) . safeConvert
+instance Convertible AlbumTitle SqlValue where
+     safeConvert (AlbumTitle a) = safeConvert a
 
 -- |The name of an artist
 newtype Name = Name Text
@@ -107,7 +116,7 @@ instance Convertible TrackCount SqlValue where
 data Recording = Recording {
      recordingId          :: RecordingID,
      recordingFile        :: AudioFileName,
-     recordingTitle       :: Maybe Title,
+     recordingTitle       :: Maybe RecordingTitle,
      recordingArtist      :: Maybe Artist,
      recordingAlbum       :: Maybe Album,
      recordingTrackNumber :: Maybe TrackNumber
@@ -119,7 +128,7 @@ type AlbumID = Id Album
 -- |Record describing an album
 data Album = Album {
      albumId        :: AlbumID,
-     albumTitle     :: Title,
+     albumTitle     :: AlbumTitle,
      albumArtist    :: Maybe Artist,
      albumNumTracks :: TrackCount
 } deriving Show
@@ -406,7 +415,7 @@ getAlbum albumID = do
     return $ Album albumID title artist numTracks
 
 -- |An album which may not yet have been added to the database
-data NewAlbum = NewAlbum Title ArtistID TrackCount
+data NewAlbum = NewAlbum AlbumTitle ArtistID TrackCount
 
 -- |Add a new Album to the database. If successful, returns the new Album record.
 addAlbum' :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
@@ -440,7 +449,7 @@ getRecording recordingID = do
     return $ Recording recordingID file title artist album trackNumber
 
 -- |A recording which may not yet have been added to the database
-data NewRecording = NewRecording AudioFileName (Maybe Title) (Maybe ArtistID) (Maybe AlbumID) (Maybe TrackNumber)
+data NewRecording = NewRecording AudioFileName (Maybe RecordingTitle) (Maybe ArtistID) (Maybe AlbumID) (Maybe TrackNumber)
 
 -- |Add a new recording to the database. If successful, returns the new Recording record.
 addRecording' :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
