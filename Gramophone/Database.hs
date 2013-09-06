@@ -459,13 +459,13 @@ getNewRecordingID :: DBIO Integer
 getNewRecordingID = do
     [[oldID]] <- queryDB "SELECT recording_id FROM last_ids" []
     let newID = (convert oldID) + 1
-    runDB "UPDATE last_ids SET artist_id=?;" [convert newID]
+    runDB "UPDATE last_ids SET recording_id=?;" [convert newID]
     return newID
 
 addRecording :: NewRecording -> DBIO (Maybe Recording)
 addRecording (NewRecording filename title artistID albumID trackNumber) = do
     newID <- Id <$> getNewRecordingID
-    runDB "INSERT INTO recordings (id, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?);"
+    runDB "INSERT INTO recordings (id, file, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?, ?);"
         [convert newID, convert filename, convert title, convert artistID, convert albumID, convert trackNumber]
     commitDB
     Just <$> getRecording newID
