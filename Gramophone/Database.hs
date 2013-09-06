@@ -107,10 +107,10 @@ instance Convertible TrackCount SqlValue where
 data Recording = Recording {
      recordingId          :: RecordingID,
      recordingFile        :: AudioFileName,
-     recordingTitle       :: Title,
-     recordingArtist      :: Artist,
-     recordingAlbum       :: Album,
-     recordingTrackNumber :: TrackNumber
+     recordingTitle       :: Maybe Title,
+     recordingArtist      :: Maybe Artist,
+     recordingAlbum       :: Maybe Album,
+     recordingTrackNumber :: Maybe TrackNumber
 } deriving Show
 
 -- |Opaque type containing a unique identifier for an Album
@@ -120,7 +120,7 @@ type AlbumID = Id Album
 data Album = Album {
      albumId        :: AlbumID,
      albumTitle     :: Title,
-     albumArtist    :: Artist,
+     albumArtist    :: Maybe Artist,
      albumNumTracks :: TrackCount
 } deriving Show
 
@@ -280,16 +280,16 @@ initSchema conn = do
   run conn
       "CREATE TABLE albums (\n\
        \        id                  INTEGER PRIMARY KEY,\n\
-       \        title               VARCHAR(1024),\n\
+       \        title               VARCHAR(1024) NOT NULL,\n\
        \        artist              INTEGER,\n\
-       \        num_tracks          INTEGER,\n\
+       \        num_tracks          INTEGER NOT NULL,\n\
        \        FOREIGN KEY(artist) REFERENCES artists(id)\n\
        \    );\n"
        []
   run conn
       "CREATE TABLE artists (\n\
       \         id                  INTEGER PRIMARY KEY,\n\
-      \         name                VARCHAR(1024)\n\
+      \         name                VARCHAR(1024) NOT NULL\n\
       \    );\n"
       []
   run conn
@@ -402,7 +402,7 @@ getAlbum :: AlbumID -> DBIO Album
 getAlbum albumID = do
     r <- queryDB "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
     let (title, artistID, numTracks) = convert3 $ head r
-    artist <- getArtist artistID
+    artist <- overMaybe getArtist artistID
     return $ Album albumID title artist numTracks
 
 -- |An album which may not yet have been added to the database
@@ -435,12 +435,12 @@ getRecording :: RecordingID -> DBIO Recording
 getRecording recordingID = do
     r <- queryDB "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
     let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
-    artist <- getArtist artistID
-    album <- getAlbum albumID
+    artist <- overMaybe getArtist artistID
+    album <- overMaybe getAlbum albumID
     return $ Recording recordingID file title artist album trackNumber
 
 -- |A recording which may not yet have been added to the database
-data NewRecording = NewRecording AudioFileName Title ArtistID AlbumID TrackNumber
+data NewRecording = NewRecording AudioFileName (Maybe Title) (Maybe ArtistID) (Maybe AlbumID) (Maybe TrackNumber)
 
 -- |Add a new recording to the database. If successful, returns the new Recording record.
 addRecording' :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
