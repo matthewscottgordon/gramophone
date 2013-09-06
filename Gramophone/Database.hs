@@ -9,7 +9,7 @@ module Gramophone.Database
      createDatabase,
      CreateError(..),
 
-     AudioFileName,
+     AudioFileName(..),
      Title,
      TrackNumber,
      TrackCount,
@@ -63,7 +63,7 @@ data Id a = Id Integer
 type RecordingID = Id Recording
 
 -- |The name of an audio file
-newtype AudioFileName = AudioFileName Text
+newtype AudioFileName = AudioFileName FilePath
     deriving Show
 instance Convertible SqlValue AudioFileName where
     safeConvert = (fmap AudioFileName) . safeConvert
