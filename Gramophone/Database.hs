@@ -12,8 +12,8 @@ module Gramophone.Database
      AudioFileName(..),
      RecordingTitle(..),
      AlbumTitle(..),
-     TrackNumber,
-     TrackCount,
+     TrackNumber(..),
+     TrackCount(..),
      Name,
 
      DBIO(),
