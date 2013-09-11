@@ -1,4 +1,4 @@
-{-# LANGUAGE  OverloadedStrings, MultiParamTypeClasses #-}
+{-# LANGUAGE  OverloadedStrings, MultiParamTypeClasses, FunctionalDependencies, GADTs #-}
 
 -- |Create and manage the main Gramophone database.
 module Gramophone.Database 
@@ -16,7 +16,7 @@ module Gramophone.Database
      TrackCount(..),
      Name,
 
-     DBIO(),
+     MonadDB,
      withDatabase,
 
      Artist(..),
@@ -50,6 +50,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Error
 import Data.Functor
+import Control.Applicative
 import qualified Data.Traversable
 
 import Data.Convertible
@@ -316,35 +317,74 @@ initSchema conn = do
 
 
 -- | Database actions
-type DBIO a = ReaderT Sqlite.Connection IO a
+class (Monad m, MonadIO m, Functor m) => MonadDB m where
+    getConn :: m Sqlite.Connection
+    mdb :: MonadIO n => m a -> Sqlite.Connection -> n a
 
--- Opens the database, performs the action DBIO, closes the
+data DBT m a where
+    DBT :: (MonadIO m) => (Sqlite.Connection -> m a) -> DBT m a
+
+runDBT :: MonadIO m => DBT m a -> Sqlite.Connection -> m a
+runDBT (DBT f) = f
+
+mapDBT :: (MonadIO m, MonadIO n) => (m a -> n b) -> DBT m a -> DBT n b
+mapDBT f m = DBT $ f . runDBT m
+
+liftDBT :: MonadIO m => m a -> DBT m a
+liftDBT m = DBT (const m)
+
+instance (MonadIO m, Functor m) => Functor (DBT m) where
+    fmap f = mapDBT (fmap f)
+
+instance (MonadIO m, Applicative m) => Applicative (DBT m) where
+    pure    = liftDBT . pure
+    f <*> v = DBT $ \db -> runDBT f db <*> runDBT v db
+
+instance (Monad m, MonadIO m) => Monad (DBT m) where
+    return a = DBT $ \_ -> return a
+    m >>= k  = DBT $ \db -> do
+        a <- runDBT m db
+        runDBT (k a) db
+    fail msg = DBT $ \_ -> fail msg
+
+--instance MonadTrans DBT where
+--    lift = liftDBT
+
+instance (MonadIO m) => MonadIO (DBT m) where
+    liftIO = liftDBT . liftIO
+
+instance (Monad m, MonadIO m, Functor m) => MonadDB (DBT m) where
+    getConn = DBT return
+    mdb = undefined
+
+
+-- Opens the database, performs the MonadDB action, closes the
 -- database, and returns the result of the action.
-withDatabase :: DatabaseRef -> DBIO b -> IO b
+withDatabase :: (MonadIO m, Functor m) => DatabaseRef -> DBT m b -> m b
 withDatabase (DatabaseRef filename) action = do
-  conn <- Sqlite.connectSqlite3 filename
-  r <- runReaderT action conn
-  disconnect conn
+  conn <- liftIO $ Sqlite.connectSqlite3 filename
+  r <- mdb action conn
+  liftIO $ disconnect conn
   return r
 
 
-queryDB :: String -> [SqlValue] -> DBIO [[SqlValue]]
+queryDB :: (MonadDB m) => String -> [SqlValue] -> m [[SqlValue]]
 queryDB sql values = do
-  conn <- ask
+  conn <- getConn
   liftIO $ quickQuery' conn sql values
 
 
-runDB :: String -> [SqlValue] -> DBIO Integer
+runDB :: MonadDB m => String -> [SqlValue] -> m Integer
 runDB sql values = do
-  conn <- ask
+  conn <- getConn
   liftIO $ run conn sql values
 
-commitDB :: DBIO ()
+commitDB :: MonadDB m => m ()
 commitDB = do
-  conn <- ask
+  conn <- getConn
   liftIO $ commit conn
 
-wrapDB :: ( a -> DBIO b ) -> a -> DatabaseRef -> IO b
+wrapDB :: (MonadIO m, Functor m) => ( a -> DBT m b ) -> a -> DatabaseRef -> m b
 wrapDB f = \v -> \db -> withDatabase db $ f v
 
 overMaybe :: Monad m => Functor m =>  (a -> m b) -> Maybe a -> m (Maybe b)
@@ -353,10 +393,10 @@ overMaybe = Data.Traversable.mapM
 --overMaybe f (Just v) = Just <$> f v
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
-findArtists' :: Text -> DatabaseRef -> IO [Artist]
+findArtists' :: (MonadIO m, Functor m) => Text -> DatabaseRef -> m [Artist]
 findArtists' = wrapDB findArtists
 
-findArtists :: Text -> DBIO [Artist]
+findArtists :: MonadDB m => Text -> m [Artist]
 findArtists name = do
     r <- queryDB "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
@@ -366,7 +406,7 @@ findArtists name = do
 getArtist' :: ArtistID -> DatabaseRef -> IO Artist
 getArtist' = wrapDB getArtist
 
-getArtist :: ArtistID -> DBIO Artist
+getArtist :: MonadDB m => ArtistID -> m Artist
 getArtist (Id i) = do
   [[name]] <- queryDB "SELECT name FROM artists WHERE id = ?;" [convert i]
   return $ Artist (Id i) (convert name)
@@ -378,7 +418,7 @@ data NewArtist = NewArtist Name
 addArtist' :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
 addArtist' = wrapDB addArtist
 
-addArtist :: NewArtist -> DBIO (Maybe Artist)
+addArtist :: MonadDB m => NewArtist -> m (Maybe Artist)
 addArtist (NewArtist name) = do
     newID <- getNewArtistID
     runDB "INSERT INTO artists (id, name) VALUES (?, ?);" [convert newID, convert name]
@@ -386,7 +426,7 @@ addArtist (NewArtist name) = do
     Just <$> getArtist (Id newID)
 
 -- Returns an Integer that is not currently used as an ArtistID
-getNewArtistID :: DBIO Integer
+getNewArtistID :: MonadDB m => m Integer
 getNewArtistID = do
   [[oldID]] <- queryDB "SELECT artist_id FROM last_ids" []
   let newID = (convert oldID) + 1;
@@ -397,7 +437,7 @@ getNewArtistID = do
 findAlbums' :: Text -> DatabaseRef -> IO [Album]
 findAlbums' = wrapDB findAlbums
 
-findAlbums :: Text -> DBIO [Album]
+findAlbums :: MonadDB m => Text -> m [Album]
 findAlbums title = do
     r <- queryDB "SELECT id FROM albums WHERE title = ?;" [convert title]
     forM r $ \x ->
@@ -407,7 +447,7 @@ findAlbums title = do
 getAlbum' :: AlbumID -> DatabaseRef -> IO Album
 getAlbum' = wrapDB getAlbum
 
-getAlbum :: AlbumID -> DBIO Album
+getAlbum :: MonadDB m => AlbumID -> m Album
 getAlbum albumID = do
     r <- queryDB "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
     let (title, artistID, numTracks) = convert3 $ head r
@@ -421,14 +461,14 @@ data NewAlbum = NewAlbum AlbumTitle ArtistID TrackCount
 addAlbum' :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
 addAlbum' = wrapDB addAlbum
 
-getNewAlbumID :: DBIO AlbumID
+getNewAlbumID :: MonadDB m => m AlbumID
 getNewAlbumID = do
     [[oldID]] <- queryDB "SELECT album_id FROM last_ids" []
     let newID = (convert oldID) + 1
     runDB "UPDATE last_ids SET album_id=?;" [convert newID]
     return $ Id newID
 
-addAlbum :: NewAlbum -> DBIO (Maybe Album)
+addAlbum :: MonadDB m => NewAlbum -> m (Maybe Album)
 addAlbum (NewAlbum title artistID trackCount) = do
     newID <- getNewAlbumID
     runDB "INSERT INTO albums (id, title, artist, num_tracks) VALUES (?, ?, ?, ?);"
@@ -440,7 +480,7 @@ addAlbum (NewAlbum title artistID trackCount) = do
 getRecording' :: RecordingID -> DatabaseRef -> IO Recording
 getRecording' = wrapDB getRecording
 
-getRecording :: RecordingID -> DBIO Recording
+getRecording :: MonadDB m => RecordingID -> m Recording
 getRecording recordingID = do
     r <- queryDB "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
     let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
@@ -455,14 +495,14 @@ data NewRecording = NewRecording AudioFileName (Maybe RecordingTitle) (Maybe Art
 addRecording' :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
 addRecording' = wrapDB addRecording
 
-getNewRecordingID :: DBIO Integer
+getNewRecordingID :: MonadDB m => m Integer
 getNewRecordingID = do
     [[oldID]] <- queryDB "SELECT recording_id FROM last_ids" []
     let newID = (convert oldID) + 1
     runDB "UPDATE last_ids SET recording_id=?;" [convert newID]
     return newID
 
-addRecording :: NewRecording -> DBIO (Maybe Recording)
+addRecording :: MonadDB m => NewRecording -> m (Maybe Recording)
 addRecording (NewRecording filename title artistID albumID trackNumber) = do
     newID <- Id <$> getNewRecordingID
     runDB "INSERT INTO recordings (id, file, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?, ?);"
