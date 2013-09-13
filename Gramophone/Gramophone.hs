@@ -62,7 +62,7 @@ printAudioFilenames dir = scanTreeForAudioFiles dir loop
               ScanDone -> return ()
 
 
-addAudioFilesFromTree :: FilePath -> DBIO ()
+addAudioFilesFromTree :: MonadDB m => FilePath -> m ()
 addAudioFilesFromTree dir = scanTreeForAudioFiles dir loop
     where loop = do
             p <- getNextFile
@@ -77,7 +77,7 @@ addAudioFilesFromTree dir = scanTreeForAudioFiles dir loop
               ScanDone -> return ()
 
 
-addFileToDatabase :: FilePath -> DBIO ()
+addFileToDatabase :: MonadDB m => FilePath -> m ()
 addFileToDatabase filename = do
     maybeTags <- liftIO $ MC.readTagsFromFile filename
     case maybeTags of
