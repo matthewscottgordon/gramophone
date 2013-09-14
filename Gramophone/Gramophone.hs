@@ -62,14 +62,16 @@ printAudioFilenames dir = scanTreeForAudioFiles dir loop
               ScanDone -> return ()
 
 
+
 addAudioFilesFromTree :: MonadDB m => FilePath -> m ()
 addAudioFilesFromTree dir = scanTreeForAudioFiles dir loop
-    where loop = do
+    where loop :: (MonadDB m) => StateT ScanState m ()
+          loop = do
             p <- getNextFile
             case p of
               FoundFile filename -> do
                      liftIO $ putStrLn ("File: " ++ filename)
-                     lift $ addFileToDatabase filename
+                     addFileToDatabase filename
                      loop
               ScanningDirectory dirName -> do
                      liftIO $ putStr ("Scanning: " ++ dirName ++ "\r")

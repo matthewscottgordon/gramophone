@@ -1,4 +1,4 @@
-{-# LANGUAGE  OverloadedStrings, MultiParamTypeClasses, FunctionalDependencies, GADTs #-}
+{-# LANGUAGE  OverloadedStrings, MultiParamTypeClasses, FunctionalDependencies, GADTs, FlexibleInstances, UndecidableInstances #-}
 
 -- |Create and manage the main Gramophone database.
 module Gramophone.Database 
@@ -16,7 +16,11 @@ module Gramophone.Database
      TrackCount(..),
      Name,
 
-     MonadDB,
+     MonadDB(..),
+     DBT(..),
+     runDBT,
+     mapDBT,
+     liftDBT,
      withDatabase,
 
      Artist(..),
@@ -48,6 +52,8 @@ import Database.HDBC
 
 import Control.Monad
 import Control.Monad.Reader
+import Control.Monad.Trans
+import Control.Monad.Trans.State.Strict
 import Control.Error
 import Data.Functor
 import Control.Applicative
@@ -319,7 +325,6 @@ initSchema conn = do
 -- | Database actions
 class (Monad m, MonadIO m, Functor m) => MonadDB m where
     getConn :: m Sqlite.Connection
-    mdb :: MonadIO n => m a -> Sqlite.Connection -> n a
 
 data DBT m a where
     DBT :: (MonadIO m) => (Sqlite.Connection -> m a) -> DBT m a
@@ -347,15 +352,15 @@ instance (Monad m, MonadIO m) => Monad (DBT m) where
         runDBT (k a) db
     fail msg = DBT $ \_ -> fail msg
 
---instance MonadTrans DBT where
---    lift = liftDBT
 
-instance (MonadIO m) => MonadIO (DBT m) where
+instance MonadIO m => MonadIO (DBT m) where
     liftIO = liftDBT . liftIO
 
 instance (Monad m, MonadIO m, Functor m) => MonadDB (DBT m) where
     getConn = DBT return
-    mdb = undefined
+
+instance (MonadDB m) => MonadDB (StateT s m) where
+    getConn = lift getConn
 
 
 -- Opens the database, performs the MonadDB action, closes the
@@ -363,7 +368,7 @@ instance (Monad m, MonadIO m, Functor m) => MonadDB (DBT m) where
 withDatabase :: (MonadIO m, Functor m) => DatabaseRef -> DBT m b -> m b
 withDatabase (DatabaseRef filename) action = do
   conn <- liftIO $ Sqlite.connectSqlite3 filename
-  r <- mdb action conn
+  r <- runDBT action conn
   liftIO $ disconnect conn
   return r
 
