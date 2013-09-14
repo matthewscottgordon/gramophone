@@ -16,11 +16,8 @@ module Gramophone.Database
      TrackCount(..),
      Name,
 
-     MonadDB(..),
-     DBT(..),
-     runDBT,
-     --mapDBT,
-     --liftDBT,
+     MonadDB,
+     DBT,
      withDatabase,
 
      Artist(..),
@@ -183,15 +180,12 @@ databaseCurrentVersion = 0
 
 -- |Opaque type refering to a database.
 -- Some safety is provided by the fact that the type constructor is not exported—for a caller to get
--- a DatabaseRef, they must call getDatabaseRef which first checks that the database exists and creates
+-- a DatabaseRef, they must call createDatabase of openDatabase.
 -- it if necessary.
 data DatabaseRef = DatabaseRef String
 
 
-printSqlError :: SqlError -> IO ()
-printSqlError e = putStrLn $ show e
-
--- |Error values returned by openDatabase
+-- |Error values returned by openDatabase and createDatabase
 data OpenError
     = OpenDoesNotExistError        -- ^ The given filename does not exist
     | OpenBadFormatError String    -- ^ The database schema is not recognized
@@ -200,7 +194,7 @@ data OpenError
     | OpenFileError String         -- ^ File exists but could not be opened. String is HDBC error message.
     deriving (Show, Eq)
 
--- |Opens a database.
+-- |Opens a database and checks that it is a valid gramophone database.
 openDatabase :: FilePath -> IO (Either OpenError DatabaseRef)
 openDatabase filename = do
   fileExists <- doesFileExist filename
@@ -209,12 +203,6 @@ openDatabase filename = do
       checkDatabase filename
     else
       return $ Left OpenDoesNotExistError
---  where
---    checkDatabase = do
---        conn <- Sqlite.connectSqlite3 filename
---        
---        disconnect conn
---        return $ Right $ DatabaseRef filename
 
 catchSql' :: (IO a) -> (SqlError -> IO b) -> (EitherT b IO a)
 catchSql' f handler = do
@@ -226,7 +214,6 @@ catchSql' f handler = do
     wrapLeft h e = do
       r <- h e
       return $ Left r
-  
   
 checkDatabase :: FilePath -> IO (Either OpenError DatabaseRef)
 checkDatabase filepath = runEitherT $ do
@@ -259,7 +246,7 @@ data CreateError
     | CreateAlreadyExistsError -- ^ File already exists.
     deriving (Show, Eq)
 
--- |Creates a new database. Will not overwrite an existing file
+-- |Creates and initializes a new database. Will not overwrite an existing file
 createDatabase :: FilePath -> IO (Either CreateError DatabaseRef)
 createDatabase filename = do
   fileExists <- doesFileExist filename
@@ -322,8 +309,8 @@ initSchema conn = do
 
 
 
--- Opens the database, performs the MonadDB action, closes the
--- database, and returns the result of the action.
+-- |Opens the database, performs the MonadDB action, closes the
+--  database, and returns the result of the action.
 withDatabase :: (MonadIO m, Functor m) => DatabaseRef -> DBT m b -> m b
 withDatabase (DatabaseRef filename) action = do
   conn <- liftIO $ Sqlite.connectSqlite3 filename
@@ -353,23 +340,21 @@ wrapDB f = \v -> \db -> withDatabase db $ f v
 
 overMaybe :: Monad m => Functor m =>  (a -> m b) -> Maybe a -> m (Maybe b)
 overMaybe = Data.Traversable.mapM
---overMaybe _ Nothing  = return Nothing
---overMaybe f (Just v) = Just <$> f v
 
--- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
 findArtists' :: (MonadIO m, Functor m) => Text -> DatabaseRef -> m [Artist]
 findArtists' = wrapDB findArtists
 
+-- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
 findArtists :: MonadDB m => Text -> m [Artist]
 findArtists name = do
     r <- queryDB "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
   where artistFromSql (idValue:nameValue:[]) = Artist (Id (convert idValue)) (convert nameValue)
 
--- |Given an ArtistID, retrieves the Artist record from the database.
 getArtist' :: ArtistID -> DatabaseRef -> IO Artist
 getArtist' = wrapDB getArtist
 
+-- |Given an ArtistID, retrieves the Artist record from the database.
 getArtist :: MonadDB m => ArtistID -> m Artist
 getArtist (Id i) = do
   [[name]] <- queryDB "SELECT name FROM artists WHERE id = ?;" [convert i]
@@ -378,10 +363,10 @@ getArtist (Id i) = do
 -- |An artist which may not yet have been added to the database.
 data NewArtist = NewArtist Name
 
--- |Add a new Artist to the Database. If successful, returns the new Artist record.
 addArtist' :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
 addArtist' = wrapDB addArtist
 
+-- |Add a new Artist to the Database. If successful, returns the new Artist record.
 addArtist :: MonadDB m => NewArtist -> m (Maybe Artist)
 addArtist (NewArtist name) = do
     newID <- getNewArtistID
@@ -397,20 +382,20 @@ getNewArtistID = do
   runDB "UPDATE last_ids SET artist_id=?" [convert newID]
   return newID
 
--- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums' :: Text -> DatabaseRef -> IO [Album]
 findAlbums' = wrapDB findAlbums
 
+-- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums :: MonadDB m => Text -> m [Album]
 findAlbums title = do
     r <- queryDB "SELECT id FROM albums WHERE title = ?;" [convert title]
     forM r $ \x ->
       getAlbum (convert1 x)
 
--- |Given an AlbumID, retrieve the corresponding Album record from the database.
 getAlbum' :: AlbumID -> DatabaseRef -> IO Album
 getAlbum' = wrapDB getAlbum
 
+-- |Given an AlbumID, retrieve the corresponding Album record from the database.
 getAlbum :: MonadDB m => AlbumID -> m Album
 getAlbum albumID = do
     r <- queryDB "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
@@ -421,7 +406,6 @@ getAlbum albumID = do
 -- |An album which may not yet have been added to the database
 data NewAlbum = NewAlbum AlbumTitle ArtistID TrackCount
 
--- |Add a new Album to the database. If successful, returns the new Album record.
 addAlbum' :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
 addAlbum' = wrapDB addAlbum
 
@@ -432,6 +416,7 @@ getNewAlbumID = do
     runDB "UPDATE last_ids SET album_id=?;" [convert newID]
     return $ Id newID
 
+-- |Add a new Album to the database. If successful, returns the new Album record.
 addAlbum :: MonadDB m => NewAlbum -> m (Maybe Album)
 addAlbum (NewAlbum title artistID trackCount) = do
     newID <- getNewAlbumID
@@ -440,10 +425,10 @@ addAlbum (NewAlbum title artistID trackCount) = do
     commitDB
     Just <$> getAlbum newID 
 
--- |Given a RecordingID, retrieve the corresponding Recording from the database.
 getRecording' :: RecordingID -> DatabaseRef -> IO Recording
 getRecording' = wrapDB getRecording
 
+-- |Given a RecordingID, retrieve the corresponding Recording from the database.
 getRecording :: MonadDB m => RecordingID -> m Recording
 getRecording recordingID = do
     r <- queryDB "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
@@ -455,7 +440,6 @@ getRecording recordingID = do
 -- |A recording which may not yet have been added to the database
 data NewRecording = NewRecording AudioFileName (Maybe RecordingTitle) (Maybe ArtistID) (Maybe AlbumID) (Maybe TrackNumber)
 
--- |Add a new recording to the database. If successful, returns the new Recording record.
 addRecording' :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
 addRecording' = wrapDB addRecording
 
@@ -466,6 +450,7 @@ getNewRecordingID = do
     runDB "UPDATE last_ids SET recording_id=?;" [convert newID]
     return newID
 
+-- |Add a new recording to the database. If successful, returns the new Recording record.
 addRecording :: MonadDB m => NewRecording -> m (Maybe Recording)
 addRecording (NewRecording filename title artistID albumID trackNumber) = do
     newID <- Id <$> getNewRecordingID
