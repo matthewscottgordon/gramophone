@@ -10,14 +10,6 @@ import Control.Monad (forM_)
 import System.Directory (createDirectoryIfMissing,getHomeDirectory)
 
 
-printTags :: [String] -> IO ()
-printTags filenames =
-    forM_ filenames $ \filename -> do
-        maybeTags <- MC.readTagsFromFile filename
-        case maybeTags of
-          Just tags -> putStrLn ( filename ++ ":\n" ++ (show tags))
-          Nothing -> putStrLn ( "No tags for \"" ++ filename ++ "\"" )
-
 getDataDirectory :: IO String
 getDataDirectory = do
   homeDir <- getHomeDirectory

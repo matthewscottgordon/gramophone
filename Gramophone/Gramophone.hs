@@ -17,8 +17,6 @@ module Gramophone.Gramophone
 import qualified Gramophone.MediaController as MC
 import Gramophone.Database
 
-import qualified Data.Text as Text
-import Data.Text (Text)
 import System.FilePath((</>))
 import qualified System.FilePath as FilePath
 import System.Directory (createDirectoryIfMissing, doesDirectoryExist, getDirectoryContents)
@@ -27,7 +25,6 @@ import qualified System.FilePath.Glob as Glob
 import Control.Monad
 import Control.Applicative
 import Control.Monad.IO.Class
-import Control.Monad.Trans
 import Control.Monad.Trans.State.Strict
 
 import Control.Lens
@@ -46,21 +43,6 @@ audioFileGlobs = map Glob.compile ["*.flac", "*.mp3", "*.m4a"]
 -- | Given a directory, (non-recursively) scans for audio files, based on file extensions.
 scanDirectoryForAudioFiles :: FilePath -> IO [FilePath]
 scanDirectoryForAudioFiles = (return . concat . fst) <=< (Glob.globDir audioFileGlobs)
-
-
-printAudioFilenames :: FilePath -> IO ()
-printAudioFilenames dir = scanTreeForAudioFiles dir loop
-    where loop = do
-            p <- getNextFile
-            case p of
-              FoundFile filename -> do
-                     liftIO $ putStrLn ("File: " ++ filename)
-                     loop
-              ScanningDirectory dirName -> do
-                     liftIO $ putStr ("Scanning: " ++ dirName ++ "\r")
-                     loop
-              ScanDone -> return ()
-
 
 
 addAudioFilesFromTree :: MonadDB m => FilePath -> m ()
@@ -92,13 +74,9 @@ addFileToDatabase filename = do
                                                         Nothing
                                                         (getTrackNumberTag tags))
         return ()
-                     
-
-getRecordingTitleTag :: MC.Tags -> Maybe RecordingTitle
-getRecordingTitleTag tags =  RecordingTitle <$> (view MC.tagTrackName tags)
-
-getTrackNumberTag :: MC.Tags -> Maybe TrackNumber
-getTrackNumberTag tags = TrackNumber <$> (view MC.tagTrackNumber tags)
+  where
+    getRecordingTitleTag tags =  RecordingTitle <$> (view MC.tagTrackName tags)
+    getTrackNumberTag tags = TrackNumber <$> (view MC.tagTrackNumber tags)
 
 data ScanState = ScanState {
               unscannedDirectories :: [FilePath],
