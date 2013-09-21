@@ -11,6 +11,7 @@ module Gramophone.MediaController
      tagDiscNumber,
      tagNumDiscs,
 
+     MediaController,
      initMediaController,
      readTagsFromFile,
     ) where
@@ -52,10 +53,14 @@ instance Show Tags where
                      maybeLine label (Just value) = label ++ (show value) ++ "\n"
                      maybeLine _     Nothing      = ""
 
-initMediaController :: IO ()
+-- | Reference needed to call most functions in this module.
+--   Currently, this is just used to ensure the GStreamer library has been initialized.
+data MediaController = MediaController
+
+initMediaController :: IO MediaController
 initMediaController = do
   GS.init
-  return ()
+  return MediaController
 
 onNewPadConnectToSink :: GS.Element -> GS.Pad -> IO ()
 onNewPadConnectToSink sink pad = do
@@ -78,8 +83,8 @@ onNewPadConnectToSink sink pad = do
     Nothing -> return ()
 
 
-readTagsFromFile :: FilePath -> IO (Maybe Tags)
-readTagsFromFile filePath = do
+readTagsFromFile :: MediaController -> FilePath -> IO (Maybe Tags)
+readTagsFromFile _ filePath = do
   let fileUri = "file://" ++ filePath
   pipe <- GS.pipelineNew fileUri
 
