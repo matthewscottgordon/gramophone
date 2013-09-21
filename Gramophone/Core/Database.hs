@@ -1,7 +1,7 @@
 {-# LANGUAGE  OverloadedStrings, MultiParamTypeClasses #-}
 
 -- |Create and manage the main Gramophone database.
-module Gramophone.Database 
+module Gramophone.Core.Database 
     (
      DatabaseRef(),
      openDatabase,

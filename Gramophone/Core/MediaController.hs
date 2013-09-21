@@ -1,6 +1,6 @@
 {-# LANGUAGE  OverloadedStrings, TemplateHaskell #-}
 
-module Gramophone.MediaController
+module Gramophone.Core.MediaController
     (
      Tags(),
      tagTrackName,

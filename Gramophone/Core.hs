@@ -3,7 +3,7 @@
 -- |The "main" gramophone module. This module essentially exposes all application
 -- functionality as a library. The GUI module(s) then call this library.
 
-module Gramophone.Gramophone
+module Gramophone.Core
     (
      initFiles,
      scanDirectoryForAudioFiles,
@@ -11,12 +11,12 @@ module Gramophone.Gramophone
      addFileToDatabase,
      addAudioFilesFromTree,
 
-     module Gramophone.Database
+     module Gramophone.Core.Database
     ) where
 
-import qualified Gramophone.MediaController as MC
-import Gramophone.MediaController (MediaController)
-import Gramophone.Database
+import qualified Gramophone.Core.MediaController as MC
+import Gramophone.Core.MediaController (MediaController)
+import Gramophone.Core.Database
 
 import System.FilePath((</>))
 import qualified System.FilePath as FilePath

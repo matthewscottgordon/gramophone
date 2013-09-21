@@ -3,8 +3,8 @@
 
 module Gramophone.GUI (startGUI) where
 
-import qualified Gramophone.Database as DB
-import qualified Gramophone.MediaController as MC
+import qualified Gramophone.Core.Database as DB
+import qualified Gramophone.Core.MediaController as MC
 
 import Control.Monad (forM_,filterM,liftM)
 import Control.Applicative((<$>))

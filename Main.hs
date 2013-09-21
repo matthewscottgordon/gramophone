@@ -1,10 +1,8 @@
 {-# LANGUAGE TypeFamilies, QuasiQuotes, MultiParamTypeClasses,
              TemplateHaskell, OverloadedStrings #-}
 
-import qualified Gramophone.Database as DB
-import qualified Gramophone.MediaController as MC
 import qualified Gramophone.GUI as GUI
-import Gramophone.Gramophone
+import Gramophone.Core
 
 import Control.Monad (forM_)
 import System.Directory (createDirectoryIfMissing,getHomeDirectory)
@@ -20,11 +18,12 @@ getDataDirectory = do
 
 
 main :: IO ()
-main = do
-     MC.initMediaController
+main = return ()
+         --do
+     --MC.initMediaController
 
-     dataDir <- getDataDirectory
-     dbRefOrError <- DB.openDatabase (dataDir ++ "/database")
-     case dbRefOrError of
-       Right dbRef   -> GUI.startGUI dbRef
-       Left a -> putStrLn "Could not open Database."
+     --dataDir <- getDataDirectory
+     --dbRefOrError <- DB.openDatabase (dataDir ++ "/database")
+     --case dbRefOrError of
+     --  Right dbRef   -> GUI.startGUI dbRef
+     --  Left a -> putStrLn "Could not open Database."
