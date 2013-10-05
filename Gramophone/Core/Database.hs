@@ -404,7 +404,7 @@ getAlbum albumID = do
     return $ Album albumID title artist numTracks
 
 -- |An album which may not yet have been added to the database
-data NewAlbum = NewAlbum AlbumTitle ArtistID TrackCount
+data NewAlbum = NewAlbum AlbumTitle (Maybe ArtistID) TrackCount
 
 addAlbum' :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
 addAlbum' = wrapDB addAlbum
