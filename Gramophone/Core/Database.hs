@@ -341,11 +341,11 @@ wrapDB f = \v -> \db -> withDatabase db $ f v
 overMaybe :: Monad m => Functor m =>  (a -> m b) -> Maybe a -> m (Maybe b)
 overMaybe = Data.Traversable.mapM
 
-findArtists' :: (MonadIO m, Functor m) => Text -> DatabaseRef -> m [Artist]
+findArtists' :: (MonadIO m, Functor m) => ArtistName -> DatabaseRef -> m [Artist]
 findArtists' = wrapDB findArtists
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
-findArtists :: MonadDB m => Text -> m [Artist]
+findArtists :: MonadDB m => ArtistName -> m [Artist]
 findArtists name = do
     r <- queryDB "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
@@ -382,11 +382,11 @@ getNewArtistID = do
   runDB "UPDATE last_ids SET artist_id=?" [convert newID]
   return newID
 
-findAlbums' :: Text -> DatabaseRef -> IO [Album]
+findAlbums' :: AlbumTitle -> DatabaseRef -> IO [Album]
 findAlbums' = wrapDB findAlbums
 
 -- |Given the name of an Album, returns a list of all Album records that have that name.
-findAlbums :: MonadDB m => Text -> m [Album]
+findAlbums :: MonadDB m => AlbumTitle -> m [Album]
 findAlbums title = do
     r <- queryDB "SELECT id FROM albums WHERE title = ?;" [convert title]
     forM r $ \x ->
