@@ -30,6 +30,8 @@ import Control.Monad.Trans.State.Strict
 
 import Control.Lens
 
+import Data.Maybe (fromMaybe)
+
 
 -- | Given a directory, initializes a database and any other files used
 --   by Gramophone.
@@ -62,22 +64,38 @@ addAudioFilesFromTree mc dir = scanTreeForAudioFiles dir loop
               ScanDone -> return ()
 
 
-addFileToDatabase :: MonadDB m => MediaController -> FilePath -> m ()
+addFileToDatabase :: MonadDB m => MediaController -> FilePath -> m (Maybe Recording)
 addFileToDatabase mc filename = do
     maybeTags <- liftIO $ MC.readTagsFromFile mc filename
-    case maybeTags of
-      Nothing -> return ()
+    newRecording <- case maybeTags of
+      Nothing -> return $ NewRecording (AudioFileName filename) Nothing Nothing Nothing Nothing
       Just tags -> do
         liftIO $ putStrLn ("File: " ++ filename)
-        recordingRelation <- addRecording (NewRecording (AudioFileName filename)
-                                                        (getRecordingTitleTag tags)
-                                                        Nothing
-                                                        Nothing
-                                                        (getTrackNumberTag tags))
-        return ()
+        artistRelation <- case (getTag ArtistName MC.tagArtistName tags) of
+                            Nothing         -> return Nothing
+                            Just name -> do
+                                  artistRelations <- findArtists name
+                                  case artistRelations of
+                                    (a:_) -> return (Just a)
+                                    []    -> addArtist (NewArtist name)
+        albumRelation <- case (getTag AlbumTitle MC.tagAlbumName tags) of
+                           Nothing        -> return Nothing
+                           Just albumName -> do
+                                  albumRelations <- findAlbums albumName
+                                  case albumRelations of
+                                    (a:_) -> return (Just a)
+                                    []    -> addAlbum (NewAlbum albumName
+                                                                    (artistId <$> artistRelation)
+                                                                    (TrackCount $ fromMaybe 0 (view MC.tagNumTracks tags)))
+        return $ NewRecording (AudioFileName filename)
+                              (getTag RecordingTitle MC.tagTrackName tags)
+                              (artistId <$> artistRelation)
+                              (albumId <$> albumRelation)
+                              (getTag TrackNumber MC.tagTrackNumber tags)
+    addRecording newRecording
   where
-    getRecordingTitleTag tags =  RecordingTitle <$> (view MC.tagTrackName tags)
-    getTrackNumberTag tags = TrackNumber <$> (view MC.tagTrackNumber tags)
+    getTag c t ts = c <$> (view t ts)
+
 
 data ScanState = ScanState {
               unscannedDirectories :: [FilePath],
