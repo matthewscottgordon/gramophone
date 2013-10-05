@@ -14,7 +14,7 @@ module Gramophone.Core.Database
      AlbumTitle(..),
      TrackNumber(..),
      TrackCount(..),
-     Name,
+     ArtistName(..),
 
      MonadDB,
      DBT,
@@ -92,12 +92,12 @@ instance Convertible AlbumTitle SqlValue where
      safeConvert (AlbumTitle a) = safeConvert a
 
 -- |The name of an artist
-newtype Name = Name Text
+newtype ArtistName = ArtistName Text
     deriving Show
-instance Convertible SqlValue Name where
-    safeConvert = (fmap Name) . safeConvert
-instance Convertible Name SqlValue where
-     safeConvert (Name a) = safeConvert a
+instance Convertible SqlValue ArtistName where
+    safeConvert = (fmap ArtistName) . safeConvert
+instance Convertible ArtistName SqlValue where
+     safeConvert (ArtistName a) = safeConvert a
 
 -- |The track number of a recording within it's album
 newtype TrackNumber = TrackNumber Integer
@@ -142,7 +142,7 @@ type ArtistID = Id Album
 -- |Record describing a recording artist
 data Artist = Artist {
      artistId   :: ArtistID,
-     artistName :: Name
+     artistName :: ArtistName
 } deriving Show
 
 instance Convertible SqlValue (Id a) where
@@ -361,7 +361,7 @@ getArtist (Id i) = do
   return $ Artist (Id i) (convert name)
 
 -- |An artist which may not yet have been added to the database.
-data NewArtist = NewArtist Name
+data NewArtist = NewArtist ArtistName
 
 addArtist' :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
 addArtist' = wrapDB addArtist
