@@ -18,3 +18,9 @@ executable gramophone
   hs-source-dirs:      src
   main-is:             Gramophone.hs       
   build-depends:       base, transformers, mtl, errors, text, filepath, gstreamer, glib, yesod>=1.2, shakespeare-js, HDBC, HDBC-sqlite3, directory, convertible, Glob, lens
+
+Test-suite CoreTest
+  hs-source-dirs:      test
+  main-is:             CoreTest.hs
+  type:                exitcode-stdio-1.0
+  build-depends:       base, HUnit
