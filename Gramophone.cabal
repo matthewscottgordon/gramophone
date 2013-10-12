@@ -13,6 +13,7 @@ maintainer:          matthew.scott.gordon@gmail.com
 category:            Sound
 build-type:          Simple
 cabal-version:       >=1.8
+data-dir:            resources/test
 
 executable gramophone
   hs-source-dirs:      src
@@ -20,7 +21,7 @@ executable gramophone
   build-depends:       base, transformers, mtl, errors, text, filepath, gstreamer, glib, yesod>=1.2, shakespeare-js, HDBC, HDBC-sqlite3, directory, convertible, Glob, lens
 
 Test-suite CoreTest
-  hs-source-dirs:      test
+  hs-source-dirs:      test, src
   main-is:             CoreTest.hs
   type:                exitcode-stdio-1.0
-  build-depends:       base, HUnit
+  build-depends:       base, HUnit, temporary, transformers, mtl, errors, text, filepath, gstreamer, glib, yesod>=1.2, shakespeare-js, HDBC, HDBC-sqlite3, directory, convertible, Glob, lens

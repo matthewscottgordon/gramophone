@@ -1,4 +1,7 @@
 import Test.HUnit
 
-main :: IO ()
-main = return ()
+import qualified CoreTest.Database
+
+tests = TestList [CoreTest.Database.tests]
+
+main = runTestTT tests
