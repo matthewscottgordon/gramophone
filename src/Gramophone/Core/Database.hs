@@ -57,7 +57,7 @@ import Data.Convertible
 
 import System.Directory (doesFileExist)
 
-import Gramophone.Database.Monad
+import Gramophone.Core.Database.Monad
 
 
 data Id a = Id Integer

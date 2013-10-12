@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
-module Gramophone.Database.Monad
+module Gramophone.Core.Database.Monad
     (
      MonadDB(..),
      DBT(..),
