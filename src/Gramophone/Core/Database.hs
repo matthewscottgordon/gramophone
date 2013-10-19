@@ -69,7 +69,7 @@ type RecordingID = Id Recording
 
 -- |The name of an audio file
 newtype AudioFileName = AudioFileName FilePath
-    deriving Show
+    deriving (Show, Eq)
 instance Convertible SqlValue AudioFileName where
     safeConvert = (fmap AudioFileName) . safeConvert
 instance Convertible AudioFileName SqlValue where
@@ -77,7 +77,7 @@ instance Convertible AudioFileName SqlValue where
 
 -- |The title of a recording
 newtype RecordingTitle = RecordingTitle Text
-    deriving Show
+    deriving (Show, Eq)
 instance Convertible SqlValue RecordingTitle where
     safeConvert = (fmap RecordingTitle) . safeConvert
 instance Convertible RecordingTitle SqlValue where
@@ -85,7 +85,7 @@ instance Convertible RecordingTitle SqlValue where
 
 -- |The title of an album
 newtype AlbumTitle = AlbumTitle Text
-    deriving Show
+    deriving (Show, Eq)
 instance Convertible SqlValue AlbumTitle where
     safeConvert = (fmap AlbumTitle) . safeConvert
 instance Convertible AlbumTitle SqlValue where
@@ -93,7 +93,7 @@ instance Convertible AlbumTitle SqlValue where
 
 -- |The name of an artist
 newtype ArtistName = ArtistName Text
-    deriving Show
+    deriving (Show, Eq)
 instance Convertible SqlValue ArtistName where
     safeConvert = (fmap ArtistName) . safeConvert
 instance Convertible ArtistName SqlValue where
@@ -101,7 +101,7 @@ instance Convertible ArtistName SqlValue where
 
 -- |The track number of a recording within it's album
 newtype TrackNumber = TrackNumber Integer
-    deriving Show
+    deriving (Show, Eq)
 instance Convertible SqlValue TrackNumber where
     safeConvert = (fmap TrackNumber) . safeConvert
 instance Convertible TrackNumber SqlValue where
@@ -109,7 +109,7 @@ instance Convertible TrackNumber SqlValue where
 
 -- |The number of recordings in a album
 newtype TrackCount = TrackCount Integer
-    deriving Show
+    deriving (Show, Eq)
 instance Convertible SqlValue TrackCount where
     safeConvert = (fmap TrackCount) . safeConvert
 instance Convertible TrackCount SqlValue where
