@@ -27,11 +27,28 @@ createTempDir template = do
                                        else ioError e
                              Right () -> return tmpDir
 
-data Fixture a b = Fixture (IO a) (a -> IO b)
+--data Fixture a b = Fixture (IO a) (a -> IO b)
 
-withFixture (Fixture setUp tearDown) = TestCase . (bracket setUp tearDown)
+--withFixture (Fixture setUp tearDown) = TestCase . (bracket setUp tearDown)
+withFixture :: (IO (a, IO ())) -> (a -> IO ()) -> Test
+withFixture f t = TestCase $ do
+                  (v, f') <- f
+                  finally (t v) f'
 
-emptyTempDirFixture template = Fixture (createTempDir template) (\dirName -> removeDirectoryRecursive dirName)
+--emptyTempDirFixture template = Fixture (createTempDir template) (\dirName -> removeDirectoryRecursive dirName)
+emptyTempDirFixture :: String -> (IO (FilePath, IO ()))
+emptyTempDirFixture template = do
+  tmpDir <- createTempDir template
+  return (tmpDir, (removeDirectoryRecursive tmpDir))
+  
+
+emptyDatabaseFixture :: (IO (FilePath, IO ())) -> (IO (DatabaseRef, IO ()))
+emptyDatabaseFixture tmpDirFixture = do
+  (tmpDir, tearDown) <- tmpDirFixture
+  dbEither <- createDatabase (tmpDir </> "database")
+  case dbEither of
+    Left e   -> undefined
+    Right db -> return (db, tearDown)
 
 
 tests = withFixture (emptyTempDirFixture "gramophone") $ \tmpDir -> do
