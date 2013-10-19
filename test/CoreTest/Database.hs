@@ -11,10 +11,12 @@ import System.Directory
 import System.IO.Temp
 import System.FilePath
 
-tests = TestCase $ withSystemTempDirectory "gramophone" $ \tmpDir -> do
-  dbEither <- createDatabase (tmpDir </> "database")
-  case dbEither of
-    Left e   -> assertFailure $ show e
-    Right db -> return ()
+withEmptyDatabase f = withSystemTempDirectory "gramophone" $ \tmpDir -> do
+                        dbEither <- createDatabase (tmpDir </> "database")
+                        case dbEither of
+                          Left e   -> assertFailure $ "Creating Database:" ++ (show e)
+                          Right db -> f db
+
+tests = TestCase $ withEmptyDatabase $ \_ -> return ()
 
 
