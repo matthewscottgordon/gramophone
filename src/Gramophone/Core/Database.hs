@@ -130,10 +130,10 @@ type AlbumID = Id Album
 
 -- |Record describing an album
 data Album = Album {
-     albumId        :: AlbumID,
-     albumTitle     :: AlbumTitle,
-     albumArtist    :: Maybe Artist,
-     albumNumTracks :: TrackCount
+     albumId         :: AlbumID,
+     albumTitle      :: AlbumTitle,
+     albumArtist     :: Maybe Artist,
+     albumTrackCount :: TrackCount
 } deriving Show
 
 -- |Opaque type containing a unique identifier for an Artist
