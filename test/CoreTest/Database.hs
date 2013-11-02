@@ -22,7 +22,11 @@ tests = testGroup "Database Tests"  [
          testCase "Create Database" testCreateDB,
          testCase "Add Recordings" testAddRecordings,
          testCase "Add Artists" testAddArtists,
-         testCase "Add Albums" testAddAlbums ]
+         testCase "Add Albums" testAddAlbums,
+         testCase "Add Album with Artist and Recordingss" testAddFullAlbum,
+         testCase "Find Artist by name" testFindArtists,
+         testCase "Find Album by name" testFindAlbums
+        ]
 
 
 withEmptyDatabase f = withSystemTempDirectory "gramophone" $ \tmpDir -> do
@@ -37,7 +41,7 @@ testCreateDB = withEmptyDatabase $ return ()
 
 class TestableRecord r n | n -> r where
   addRecord :: MonadDB m => n -> m (Maybe r)
-  checkRecord :: r -> n -> IO ()
+  checkRecord ::  r -> n -> IO ()
   recordName :: n -> String
 
 
@@ -52,6 +56,13 @@ testAddRecord n = do
 testAddRecords :: TestableRecord r n => [n] -> Assertion
 testAddRecords ns = withEmptyDatabase $ mapM_ testAddRecord ns
 
+addAndUseRecord :: TestableRecord r n => MonadDB m => n -> (r -> m ()) -> m ()
+addAndUseRecord n f = do
+  maybeRec <- addRecord n
+  do
+    case maybeRec of
+      Nothing -> liftIO $ assertFailure ("Could not create " ++ (recordName n) ++ " record.")
+      Just r  -> (liftIO $ checkRecord r n) >> (f r)
 
 
 instance TestableRecord Recording NewRecording where
@@ -87,7 +98,7 @@ testAddAlbums = testAddRecords [new1, new2]
 
 
 
-instance TestableRecord Artist  NewArtist where
+instance TestableRecord Artist NewArtist where
   addRecord = addArtist
   checkRecord a (NewArtist name) = do
     assertEqual "Name wrong on Artisrt record." (artistName a) name
@@ -99,3 +110,72 @@ testAddArtists = testAddRecords [new1, new2]
                  new2 = NewArtist (ArtistName "Johnny Q. Artist")
 
 
+setUpTestDatabase = do
+    addAndUseRecord (NewArtist (ArtistName "Disaster Area")) $ \artist ->
+        addAndUseRecord (NewAlbum (AlbumTitle "An Album") (Just (artistId artist)) (TrackCount 5)) $ \album -> do
+            testAddRecord (NewRecording (AudioFileName "/Music/Disaster_Area/An_Album/Song.flac")
+                                          (Just $ RecordingTitle "Song")
+                                          (Just $ artistId artist)
+                                          (Just $ albumId album)
+                                          (Just $ (TrackNumber 1)))
+            testAddRecord (NewRecording (AudioFileName "/Music/Disaster_Area/An_Album/Song_2.flac")
+                                          (Just $ RecordingTitle "Song 2")
+                                          (Just $ artistId artist)
+                                          (Just $ albumId album)
+                                          (Just $ (TrackNumber 2)))
+            testAddRecord (NewRecording (AudioFileName "/Music/Disaster_Area/An_Album/Song_B.flac")
+                                          (Just $ RecordingTitle "Song C")
+                                          (Just $ artistId artist)
+                                          (Just $ albumId album)
+                                          (Just $ (TrackNumber 3)))
+            testAddRecord (NewRecording (AudioFileName "/Music/Disaster_Area/An_Album/The_End.flac")
+                                          (Just $ RecordingTitle "The End")
+                                          (Just $ artistId artist)
+                                          (Just $ albumId album)
+                                          (Just $ (TrackNumber 4)))
+    addAndUseRecord (NewArtist (ArtistName "Artist")) $ \artist ->
+        addAndUseRecord (NewAlbum (AlbumTitle "An Album by an Artist") (Just (artistId artist)) (TrackCount 4)) $ \album -> do
+            testAddRecord (NewRecording (AudioFileName "/Music/Artist/An_Album/Song.flac")
+                                          (Just $ RecordingTitle "Song")
+                                          (Just $ artistId artist)
+                                          (Just $ albumId album)
+                                          (Just $ (TrackNumber 1)))
+            testAddRecord (NewRecording (AudioFileName "/Music/Artist/An_Album/Song_2.flac")
+                                          (Just $ RecordingTitle "Song 2")
+                                          (Just $ artistId artist)
+                                          (Just $ albumId album)
+                                          (Just $ (TrackNumber 2)))
+            testAddRecord (NewRecording (AudioFileName "/Music/Artist/An_Album/Song_B.flac")
+                                          (Just $ RecordingTitle "Song C")
+                                          (Just $ artistId artist)
+                                          (Just $ albumId album)
+                                          (Just $ (TrackNumber 3)))
+
+withTestDatabase f = withEmptyDatabase $ setUpTestDatabase >> f
+
+testAddFullAlbum = withTestDatabase $ return ()
+
+
+testFindArtists = withTestDatabase $ do
+    artists <- findArtists (ArtistName "Disaster Area")
+    liftIO $ do
+      (1 @=? (length artists))
+      let artist = head artists
+      (ArtistName "Disaster Area") @=? artistName artist
+    artists <- findArtists (ArtistName "Kevin")
+    liftIO $ assertBool "Found artist where none expected." $ null artists
+
+
+testFindAlbums = withTestDatabase $ do
+    albums <- findAlbums (AlbumTitle "An Album by an Artist")
+    liftIO $ do
+      1 @=? length albums
+      let album = head albums
+      (AlbumTitle "An Album by an Artist") @=? albumTitle album
+      (TrackCount 4) @=? albumTrackCount album
+      case (albumArtist album) of
+        Nothing     -> assertFailure "No Artist for Album where expected."
+        Just artist -> (ArtistName "Artist") @=? artistName artist
+
+
+--testFindRecordings = withEmptyData
