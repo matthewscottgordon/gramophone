@@ -1,7 +1,8 @@
+import Test.Framework (defaultMain)
 import Test.HUnit
 
 import qualified CoreTest.Database
 
-tests = TestList [CoreTest.Database.tests]
+tests = [CoreTest.Database.tests]
 
-main = runTestTT tests
+main = defaultMain tests

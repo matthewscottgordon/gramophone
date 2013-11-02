@@ -8,6 +8,8 @@ module CoreTest.Database
 import Gramophone.Core.Database
 
 import Test.HUnit
+import Test.Framework (testGroup)
+import Test.Framework.Providers.HUnit
 
 import System.Directory
 import System.IO.Temp
@@ -16,10 +18,12 @@ import System.FilePath
 import Control.Monad
 import Control.Monad.Trans
 
-tests = TestList [testCreateDB, testAddRecordings, testAddArtists, testAddAlbums]
+tests = testGroup "Database Tests"  [
+         testCase "Create Database" testCreateDB,
+         testCase "Add Recordings" testAddRecordings,
+         testCase "Add Artists" testAddArtists,
+         testCase "Add Albums" testAddAlbums ]
 
-
-testWithEmptyDatabase = TestCase . withEmptyDatabase
 
 withEmptyDatabase f = withSystemTempDirectory "gramophone" $ \tmpDir -> do
                         dbEither <- createDatabase (tmpDir </> "database")
@@ -28,7 +32,7 @@ withEmptyDatabase f = withSystemTempDirectory "gramophone" $ \tmpDir -> do
                           Right db -> withDatabase db f
 
 
-testCreateDB = TestCase $ withEmptyDatabase $ return ()
+testCreateDB = withEmptyDatabase $ return ()
 
 
 class TestableRecord r n | n -> r where
@@ -45,8 +49,8 @@ testAddRecord n = do
       Nothing -> assertFailure ("Could not create " ++ (recordName n) ++ " record.")
       Just r  -> checkRecord r n
       
-testAddRecords :: TestableRecord r n => [n] -> Test
-testAddRecords ns = testWithEmptyDatabase $ mapM_ testAddRecord ns
+testAddRecords :: TestableRecord r n => [n] -> Assertion
+testAddRecords ns = withEmptyDatabase $ mapM_ testAddRecord ns
 
 
 
