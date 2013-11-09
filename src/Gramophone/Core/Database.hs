@@ -137,7 +137,7 @@ data Album = Album {
 } deriving Show
 
 -- |Opaque type containing a unique identifier for an Artist
-type ArtistID = Id Album
+type ArtistID = Id Artist
 
 -- |Record describing a recording artist
 data Artist = Artist {
