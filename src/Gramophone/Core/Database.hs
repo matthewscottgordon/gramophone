@@ -36,9 +36,10 @@ module Gramophone.Core.Database
 
      Recording(..),
      RecordingID(),
+     findRecordings,
      getRecording,
      NewRecording(..),
-     addRecording,
+     addRecording
     ) where
 
 import qualified Data.Text as T
@@ -459,6 +460,9 @@ addRecording (NewRecording filename title artistID albumID trackNumber) = do
     commitDB
     Just <$> getRecording newID
 
+
+findRecordings :: MonadDB m => RecordingTitle -> m [Recording]
+findRecordings = undefined
 
 
 
