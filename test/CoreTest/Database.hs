@@ -16,6 +16,7 @@ import System.IO.Temp
 import System.FilePath
 
 import Control.Monad.Trans
+import Data.Maybe
 
 tests :: Test.Framework.Test
 tests = testGroup "Database Tests"  [
@@ -25,7 +26,8 @@ tests = testGroup "Database Tests"  [
          testCase "Add Albums" testAddAlbums,
          testCase "Add Album with Artist and Recordingss" testAddFullAlbum,
          testCase "Find Artist by name" testFindArtists,
-         testCase "Find Album by name" testFindAlbums
+         testCase "Find Album by name" testFindAlbums,
+         testCase "Find Recordings by name" testFindRecordings
         ]
 
 
@@ -188,4 +190,12 @@ testFindAlbums = withTestDatabase $ do
         Just artist -> (ArtistName "Artist") @=? artistName artist
 
 
---testFindRecordings = withEmptyData
+testFindRecordings :: Assertion
+testFindRecordings = withTestDatabase $ do
+    recordings <- findRecordings (RecordingTitle "Song C")
+    liftIO $ 2 @=? length recordings
+    let artists = catMaybes $ map recordingArtist recordings
+    liftIO $ do
+      2 @=? length artists
+      assertBool "Can't find expected artist for recording." $ any ((== (ArtistName "Artist")) . artistName) artists
+      assertBool "Can't find expected artist for recording." $ any ((== (ArtistName "Disaster Area")) . artistName) artists
