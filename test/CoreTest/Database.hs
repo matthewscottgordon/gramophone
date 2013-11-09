@@ -9,15 +9,15 @@ import Gramophone.Core.Database
 
 import Test.HUnit
 import Test.Framework (testGroup)
+import qualified Test.Framework
 import Test.Framework.Providers.HUnit
 
-import System.Directory
 import System.IO.Temp
 import System.FilePath
 
-import Control.Monad
 import Control.Monad.Trans
 
+tests :: Test.Framework.Test
 tests = testGroup "Database Tests"  [
          testCase "Create Database" testCreateDB,
          testCase "Add Recordings" testAddRecordings,
@@ -29,6 +29,7 @@ tests = testGroup "Database Tests"  [
         ]
 
 
+withEmptyDatabase :: DBT IO () -> IO ()
 withEmptyDatabase f = withSystemTempDirectory "gramophone" $ \tmpDir -> do
                         dbEither <- createDatabase (tmpDir </> "database")
                         case dbEither of
@@ -36,6 +37,7 @@ withEmptyDatabase f = withSystemTempDirectory "gramophone" $ \tmpDir -> do
                           Right db -> withDatabase db f
 
 
+testCreateDB :: Assertion
 testCreateDB = withEmptyDatabase $ return ()
 
 
@@ -73,6 +75,7 @@ instance TestableRecord Recording NewRecording where
     assertEqual "Track number wrong in track record." (recordingTrackNumber r) trackNum'
   recordName _ = "Recording"
 
+testAddRecordings :: Assertion
 testAddRecordings = testAddRecords [new1, new2]
   where
     filename1 = AudioFileName "/home/foo/Music/file1"
@@ -91,6 +94,7 @@ instance TestableRecord Album NewAlbum where
     assertEqual "TrackCount wrong in Album record." (albumTrackCount a) trackCount
   recordName _ = "Album"
 
+testAddAlbums :: Assertion
 testAddAlbums = testAddRecords [new1, new2]
                where
                  new1 = NewAlbum (AlbumTitle "An Album") Nothing (TrackCount 0)
@@ -104,12 +108,14 @@ instance TestableRecord Artist NewArtist where
     assertEqual "Name wrong on Artisrt record." (artistName a) name
   recordName _ = "Artist"
 
+testAddArtists :: Assertion
 testAddArtists = testAddRecords [new1, new2]
                where
                  new1 = NewArtist (ArtistName "artist")
                  new2 = NewArtist (ArtistName "Johnny Q. Artist")
 
 
+setUpTestDatabase :: MonadDB m => m ()
 setUpTestDatabase = do
     addAndUseRecord (NewArtist (ArtistName "Disaster Area")) $ \artist ->
         addAndUseRecord (NewAlbum (AlbumTitle "An Album") (Just (artistId artist)) (TrackCount 5)) $ \album -> do
@@ -151,21 +157,25 @@ setUpTestDatabase = do
                                           (Just $ albumId album)
                                           (Just $ (TrackNumber 3)))
 
+withTestDatabase :: DBT IO () -> Assertion
 withTestDatabase f = withEmptyDatabase $ setUpTestDatabase >> f
 
+testAddFullAlbum :: Assertion
 testAddFullAlbum = withTestDatabase $ return ()
 
 
+testFindArtists :: Assertion
 testFindArtists = withTestDatabase $ do
     artists <- findArtists (ArtistName "Disaster Area")
     liftIO $ do
       (1 @=? (length artists))
       let artist = head artists
       (ArtistName "Disaster Area") @=? artistName artist
-    artists <- findArtists (ArtistName "Kevin")
-    liftIO $ assertBool "Found artist where none expected." $ null artists
+    artists2 <- findArtists (ArtistName "Kevin")
+    liftIO $ assertBool "Found artist where none expected." $ null artists2
 
 
+testFindAlbums :: Assertion
 testFindAlbums = withTestDatabase $ do
     albums <- findAlbums (AlbumTitle "An Album by an Artist")
     liftIO $ do
