@@ -31,3 +31,16 @@ I decided it would be easier to use a Haskell-specific framework for my first
 significant Haskell project. The added bonus is that you'll be able to install
 Gramophone on an HTPC and then controll it remotely using another computer,
 tablet or (possibly) phone.
+
+Building
+--------
+
+The following packages are required to build Gramophone on Ubuntu 13.10:
+
+* haskell-platform
+* libsqlite3-dev
+* libglib2.0-dev
+* libgstreamer0.10-dev
+* libgstreamer-plugins-base0.10-dev
+
+Additionally, gtk2hs-buildtools must be installed via cabal.
