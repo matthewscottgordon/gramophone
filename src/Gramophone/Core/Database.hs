@@ -462,7 +462,8 @@ addRecording (NewRecording filename title artistID albumID trackNumber) = do
 
 
 findRecordings :: MonadDB m => RecordingTitle -> m [Recording]
-findRecordings = undefined
-
+findRecordings title = do
+    rs <- queryDB "SELECT id FROM recordings WHERE title = ?;" [convert title]
+    forM rs (getRecording . convert1)
 
 
