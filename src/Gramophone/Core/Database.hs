@@ -354,14 +354,8 @@ commitDB = do
   conn <- getConn
   liftIO $ commit conn
 
-wrapDB :: (MonadIO m, Functor m) => ( a -> DBT m b ) -> a -> DatabaseRef -> m b
-wrapDB f = \v -> \db -> withDatabase db $ f v
-
 overMaybe :: Monad m => Functor m =>  (a -> m b) -> Maybe a -> m (Maybe b)
 overMaybe = Data.Traversable.mapM
-
-findArtists' :: (MonadIO m, Functor m) => ArtistName -> DatabaseRef -> m [Artist]
-findArtists' = wrapDB findArtists
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
 findArtists :: MonadDB m => ArtistName -> m [Artist]
@@ -369,9 +363,6 @@ findArtists name = do
     r <- queryDB "SELECT id, name FROM artists WHERE name = ?;" [convert name]
     return $ map artistFromSql r
   where artistFromSql (idValue:nameValue:[]) = Artist (Id (convert idValue)) (convert nameValue)
-
-getArtist' :: ArtistID -> DatabaseRef -> IO Artist
-getArtist' = wrapDB getArtist
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
 getArtist :: MonadDB m => ArtistID -> m Artist
@@ -381,9 +372,6 @@ getArtist (Id i) = do
 
 -- |An artist which may not yet have been added to the database.
 data NewArtist = NewArtist ArtistName
-
-addArtist' :: NewArtist -> DatabaseRef -> IO (Maybe Artist)
-addArtist' = wrapDB addArtist
 
 -- |Add a new Artist to the Database. If successful, returns the new Artist record.
 addArtist :: MonadDB m => NewArtist -> m (Maybe Artist)
@@ -401,18 +389,12 @@ getNewArtistID = do
   runDB "UPDATE last_ids SET artist_id=?" [convert newID]
   return newID
 
-findAlbums' :: AlbumTitle -> DatabaseRef -> IO [Album]
-findAlbums' = wrapDB findAlbums
-
 -- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums :: MonadDB m => AlbumTitle -> m [Album]
 findAlbums title = do
     r <- queryDB "SELECT id FROM albums WHERE title = ?;" [convert title]
     forM r $ \x ->
       getAlbum (convert1 x)
-
-getAlbum' :: AlbumID -> DatabaseRef -> IO Album
-getAlbum' = wrapDB getAlbum
 
 -- |Given an AlbumID, retrieve the corresponding Album record from the database.
 getAlbum :: MonadDB m => AlbumID -> m Album
@@ -424,9 +406,6 @@ getAlbum albumID = do
 
 -- |An album which may not yet have been added to the database
 data NewAlbum = NewAlbum AlbumTitle (Maybe ArtistID) TrackCount
-
-addAlbum' :: NewAlbum -> DatabaseRef -> IO (Maybe Album)
-addAlbum' = wrapDB addAlbum
 
 getNewAlbumID :: MonadDB m => m AlbumID
 getNewAlbumID = do
@@ -444,9 +423,6 @@ addAlbum (NewAlbum title artistID trackCount) = do
     commitDB
     Just <$> getAlbum newID 
 
-getRecording' :: RecordingID -> DatabaseRef -> IO Recording
-getRecording' = wrapDB getRecording
-
 -- |Given a RecordingID, retrieve the corresponding Recording from the database.
 getRecording :: MonadDB m => RecordingID -> m Recording
 getRecording recordingID = do
@@ -458,9 +434,6 @@ getRecording recordingID = do
 
 -- |A recording which may not yet have been added to the database
 data NewRecording = NewRecording AudioFileName (Maybe RecordingTitle) (Maybe ArtistID) (Maybe AlbumID) (Maybe TrackNumber)
-
-addRecording' :: NewRecording -> DatabaseRef -> IO (Maybe Recording)
-addRecording' = wrapDB addRecording
 
 getNewRecordingID :: MonadDB m => m Integer
 getNewRecordingID = do
