@@ -33,7 +33,7 @@ import Control.Applicative
 import qualified Database.HDBC.Sqlite3 as Sqlite
 
 
-class (Monad m, MonadIO m, Functor m) => MonadDB m where
+class (Monad m, MonadIO m, Functor m, Applicative m) => MonadDB m where
     getConn :: m Sqlite.Connection
 
 
@@ -67,7 +67,7 @@ instance (Monad m, MonadIO m) => Monad (DBT m) where
 instance MonadIO m => MonadIO (DBT m) where
     liftIO = liftDBT . liftIO
 
-instance (Monad m, MonadIO m, Functor m) => MonadDB (DBT m) where
+instance (Monad m, MonadIO m, Functor m, Applicative m) => MonadDB (DBT m) where
     getConn = DBT return
 
 instance (MonadDB m) => MonadDB (StateT s m) where
