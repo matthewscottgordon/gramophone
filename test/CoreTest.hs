@@ -16,11 +16,13 @@
     along with Gramophone.  If not, see <http://www.gnu.org/licenses/>.
 -}
 
-import Test.Framework (defaultMain)
-import Test.HUnit
+import Test.Framework (defaultMain, Test)
 
 import qualified CoreTest.Database
+import qualified CoreTest.MediaController
 
-tests = [CoreTest.Database.tests]
+tests :: [Test]
+tests = [CoreTest.Database.tests, CoreTest.MediaController.tests]
 
+main :: IO ()
 main = defaultMain tests
