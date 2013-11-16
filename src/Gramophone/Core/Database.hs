@@ -60,17 +60,19 @@ module Gramophone.Core.Database
      addRecording
     ) where
 
+import Prelude hiding (mapM)
+
 import qualified Data.Text as T
 import Data.Text (Text)
 
 import qualified Database.HDBC.Sqlite3 as Sqlite
 import Database.HDBC
 
-import Control.Monad
+import Control.Monad hiding (mapM, forM)
 import Control.Monad.Trans
 import Control.Error
 import Control.Applicative
-import qualified Data.Traversable
+import Data.Traversable
 
 import Data.Convertible
 
@@ -255,8 +257,7 @@ getMagic conn = do
       return $ convert $ head $ head r
 
 getVersion :: Sqlite.Connection -> IO Integer
-getVersion conn = do
-  (convert . head . head) <$> quickQuery' conn "SELECT version FROM database_info;" []
+getVersion conn = (convert . head . head) <$> quickQuery' conn "SELECT version FROM database_info;" []
 
 
 -- | Error values returned by createDatabase
@@ -354,14 +355,9 @@ commitDB = do
   conn <- getConn
   liftIO $ commit conn
 
-overMaybe :: Monad m => Functor m =>  (a -> m b) -> Maybe a -> m (Maybe b)
-overMaybe = Data.Traversable.mapM
-
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
 findArtists :: MonadDB m => ArtistName -> m [Artist]
-findArtists name = do
-    r <- queryDB "SELECT id, name FROM artists WHERE name = ?;" [convert name]
-    return $ map artistFromSql r
+findArtists name = (map artistFromSql) <$> queryDB "SELECT id, name FROM artists WHERE name = ?;" [convert name]
   where artistFromSql (idValue:nameValue:[]) = Artist (Id (convert idValue)) (convert nameValue)
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
@@ -388,20 +384,18 @@ getNewArtistID = do
   let newID = (convert oldID) + 1;
   runDB "UPDATE last_ids SET artist_id=?" [convert newID]
   return newID
-
+  
 -- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums :: MonadDB m => AlbumTitle -> m [Album]
-findAlbums title = do
-    r <- queryDB "SELECT id FROM albums WHERE title = ?;" [convert title]
-    forM r $ \x ->
-      getAlbum (convert1 x)
+findAlbums title = mapM (getAlbum . convert1) =<< queryDB "SELECT id FROM albums WHERE title = ?;" [convert title]
+
 
 -- |Given an AlbumID, retrieve the corresponding Album record from the database.
 getAlbum :: MonadDB m => AlbumID -> m Album
 getAlbum albumID = do
     r <- queryDB "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
     let (title, artistID, numTracks) = convert3 $ head r
-    artist <- overMaybe getArtist artistID
+    artist <- mapM getArtist artistID
     return $ Album albumID title artist numTracks
 
 -- |An album which may not yet have been added to the database
@@ -428,8 +422,8 @@ getRecording :: MonadDB m => RecordingID -> m Recording
 getRecording recordingID = do
     r <- queryDB "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
     let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
-    artist <- overMaybe getArtist artistID
-    album <- overMaybe getAlbum albumID
+    artist <- mapM getArtist artistID
+    album <- mapM getAlbum albumID
     return $ Recording recordingID file title artist album trackNumber
 
 -- |A recording which may not yet have been added to the database
