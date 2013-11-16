@@ -28,6 +28,7 @@ module Gramophone.Core.MediaController
      tagNumTracks,
      tagDiscNumber,
      tagNumDiscs,
+     emptyTags,
 
      MediaController,
      initMediaController,
@@ -57,6 +58,8 @@ $(makeLenses ''Tags)
 
 modifyTag l v = l `over` (<|> v)
 
+emptyTags :: Tags
+emptyTags = Tags Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 instance Show Tags where
     show (Tags maybeTrackName maybeAlbumName maybeArtistName maybeTrackNumber maybeNumTracks maybeDiscNumber maybeNumDiscs) =
@@ -129,7 +132,7 @@ readTagsFromFile _ filePath = do
                     return Nothing
 
 getTags :: GS.Bus -> IO (Either String Tags)
-getTags bus = loop (Tags Nothing Nothing Nothing Nothing Nothing Nothing Nothing)
+getTags bus = loop emptyTags
   where
     loop :: Tags -> IO (Either String Tags)
     loop tags = do
