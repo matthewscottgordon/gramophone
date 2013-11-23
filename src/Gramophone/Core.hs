@@ -29,11 +29,12 @@ module Gramophone.Core
      addFileToDatabase,
      addAudioFilesFromTree,
 
-     module Gramophone.Core.Database
+     module Gramophone.Core.Database,
+     module Gramophone.Core.MediaController
     ) where
 
 import qualified Gramophone.Core.MediaController as MC
-import Gramophone.Core.MediaController (MediaController)
+import Gramophone.Core.MediaController (MediaController, initMediaController)
 import Gramophone.Core.Database
 
 import System.FilePath((</>))
