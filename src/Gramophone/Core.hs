@@ -24,6 +24,7 @@
 module Gramophone.Core
     (
      initFiles,
+     openFiles,
      scanDirectoryForAudioFiles,
      scanTreeForAudioFiles,
      addFileToDatabase,
@@ -58,6 +59,9 @@ initFiles :: FilePath -> IO (Either CreateError DatabaseRef)
 initFiles location = do
   createDirectoryIfMissing True location
   createDatabase $ location </> "database"
+  
+openFiles :: FilePath -> IO (Either OpenError DatabaseRef)
+openFiles location = openDatabase $ location </> "database"
 
 audioFileGlobs :: [Glob.Pattern]
 audioFileGlobs = map Glob.compile ["*.flac", "*.mp3", "*.m4a"]

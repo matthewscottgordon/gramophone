@@ -22,26 +22,34 @@
 import qualified Gramophone.GUI as GUI
 import Gramophone.Core
 
-import Control.Monad (forM_)
-import System.Directory (createDirectoryIfMissing,getHomeDirectory)
+import System.Directory
+import System.FilePath
+import System.Environment
 
 
-getDataDirectory :: IO String
+getDataDirectory :: IO FilePath
 getDataDirectory = do
   homeDir <- getHomeDirectory
-  let dataDir = homeDir ++ "/.gramophone"
+  let dataDir = homeDir </> ".gramophone"
   createDirectoryIfMissing False dataDir
   return dataDir
 
 
+printHelp :: IO ()
+printHelp = putStrLn "Usage: gramophone [dataDirectory]"
 
 main :: IO ()
-main = return ()
-         --do
-     --MC.initMediaController
-
-     --dataDir <- getDataDirectory
-     --dbRefOrError <- DB.openDatabase (dataDir ++ "/database")
-     --case dbRefOrError of
-     --  Right dbRef   -> GUI.startGUI dbRef
-     --  Left a -> putStrLn "Could not open Database."
+main = do
+    args <- getArgs
+    case args of
+      (opt:dir:[]) | opt == "--create" -> runWith initFiles dir
+      (arg:[])     | arg == "--create" -> getDataDirectory >>= runWith initFiles
+                   | otherwise         -> runWith openFiles arg
+      []                               -> getDataDirectory >>= runWith openFiles
+      otherwise                        -> printHelp
+  where
+    runWith f dir = do
+      r <- f dir
+      case r of
+        Left e   -> putStrLn (show e)
+        Right db -> putStrLn ("Running Web GUI with \"" ++ dir ++ "\"") >> GUI.startGUI db
