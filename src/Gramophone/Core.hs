@@ -59,9 +59,13 @@ initFiles :: FilePath -> IO (Either CreateError DatabaseRef)
 initFiles location = do
   createDirectoryIfMissing True location
   createDatabase $ location </> "database"
-  
+    
+
+-- | Given the gramophone directory, returns a DatabaseRef pointing
+--   to it.
 openFiles :: FilePath -> IO (Either OpenError DatabaseRef)
 openFiles location = openDatabase $ location </> "database"
+  
 
 audioFileGlobs :: [Glob.Pattern]
 audioFileGlobs = map Glob.compile ["*.flac", "*.mp3", "*.m4a"]
