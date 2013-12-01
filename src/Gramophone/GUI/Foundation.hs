@@ -19,29 +19,32 @@
 {-# LANGUAGE TypeFamilies, QuasiQuotes, MultiParamTypeClasses,
              TemplateHaskell, OverloadedStrings #-}
 
-module Gramophone.GUI (startGUI) where
+module Gramophone.GUI.Foundation where
 
-import qualified Gramophone.Core.Database as DB
-
-import Control.Applicative((<$>))
-import System.Directory (getHomeDirectory)
 import Yesod
 
-import Gramophone.GUI.Foundation
-import Gramophone.GUI.BrowseForFiles
+import Gramophone.Core.Database as DB
+
+import System.FilePath as FilePath
+import qualified Data.Text as T
 
 
-mkYesodDispatch "Website" resourcesWebsite
-
-getTestR :: Handler Html
-getTestR = defaultLayout $ do
-    setTitle "Gramophone - Testing Functions"
-    browseFilesStartDir <- liftIO $ RawFilePath <$> getHomeDirectory
-    [whamlet|
-              <body>
-                  <h1>Testing Functions
-                  <a href=@{BrowseForFilesR browseFilesStartDir}>Browse for Files|]
+data RawFilePath = RawFilePath FilePath.FilePath
+                   deriving(Show, Eq, Read)
 
 
-startGUI :: DB.DatabaseRef -> IO ()
-startGUI dbRef = warp 3000 $ Website dbRef
+instance PathMultiPiece RawFilePath where
+    toPathMultiPiece (RawFilePath p) = map T.pack $ FilePath.splitDirectories p
+    fromPathMultiPiece ts = let filePath = FilePath.joinPath $ map T.unpack ts
+                            in if FilePath.isValid filePath
+                              then Just $ RawFilePath filePath
+                              else Nothing
+
+data Website = Website DB.DatabaseRef
+
+mkYesodData "Website" [parseRoutes|
+/                        TestR GET
+/FileSystem/*RawFilePath BrowseForFilesR GET
+|]
+
+instance Yesod Website
