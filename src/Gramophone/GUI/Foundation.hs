@@ -19,11 +19,16 @@
 {-# LANGUAGE TypeFamilies, QuasiQuotes, MultiParamTypeClasses,
              TemplateHaskell, OverloadedStrings #-}
 
-module Gramophone.GUI.Foundation where
+module Gramophone.GUI.Foundation 
+       (
+         module Gramophone.GUI.Foundation,
+         module Gramophone.Core
+       ) where
 
 import Yesod
 
-import Gramophone.Core.Database as DB
+import qualified Gramophone.Core.Database as DB
+import Gramophone.Core hiding (withDatabase)
 
 import System.FilePath as FilePath
 import qualified Data.Text as T
@@ -40,11 +45,17 @@ instance PathMultiPiece RawFilePath where
                               then Just $ RawFilePath filePath
                               else Nothing
 
-data Website = Website DB.DatabaseRef
+data Website = Website DatabaseRef
+
+withDatabase :: (MonadHandler m, HandlerSite m ~ Website) => DBT m b -> m b
+withDatabase f = do
+  Website dbr <- getYesod
+  DB.withDatabase dbr f
 
 mkYesodData "Website" [parseRoutes|
 /                        TestR GET
 /FileSystem/*RawFilePath BrowseForFilesR GET
+/Recordings              ListRecordingsR GET
 |]
 
 instance Yesod Website

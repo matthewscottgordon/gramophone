@@ -29,6 +29,7 @@ import Yesod
 
 import Gramophone.GUI.Foundation
 import Gramophone.GUI.BrowseForFiles
+import Gramophone.GUI.ListRecordings
 
 
 mkYesodDispatch "Website" resourcesWebsite
@@ -40,7 +41,8 @@ getTestR = defaultLayout $ do
     [whamlet|
               <body>
                   <h1>Testing Functions
-                  <a href=@{BrowseForFilesR browseFilesStartDir}>Browse for Files|]
+                  <a href=@{BrowseForFilesR browseFilesStartDir}>Browse for Files
+                  <a href=@{ListRecordingsR}>List Recordings|]
 
 
 startGUI :: DB.DatabaseRef -> IO ()

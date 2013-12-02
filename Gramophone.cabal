@@ -18,10 +18,10 @@ data-dir:            resources/test
 executable gramophone
   hs-source-dirs:      src
   main-is:             Gramophone.hs       
-  build-depends:       base, transformers, mtl, errors, text, filepath, gstreamer, glib, yesod>=1.2, shakespeare-js, HDBC, HDBC-sqlite3, directory, convertible, Glob, lens
+  build-depends:       base, transformers, mtl, errors, text, filepath, gstreamer, glib, yesod>=1.2, shakespeare-js, HDBC, HDBC-sqlite3, directory, convertible, Glob, lens, blaze-markup
 
 Test-suite CoreTest
   hs-source-dirs:      test, src
   main-is:             CoreTest.hs
   type:                exitcode-stdio-1.0
-  build-depends:       base, HUnit, test-framework, test-framework-hunit, temporary, transformers, mtl, errors, text, filepath, gstreamer, glib, yesod>=1.2, shakespeare-js, HDBC, HDBC-sqlite3, directory, convertible, Glob, lens
+  build-depends:       base, HUnit, test-framework, test-framework-hunit, temporary, transformers, mtl, errors, text, filepath, gstreamer, glib, yesod>=1.2, shakespeare-js, HDBC, HDBC-sqlite3, directory, convertible, Glob, lens, blaze-markup
