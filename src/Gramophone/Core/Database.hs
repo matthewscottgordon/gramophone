@@ -40,6 +40,7 @@ module Gramophone.Core.Database
 
      Artist(..),
      ArtistID(),
+     getAllArtists,
      findArtists,
      getArtist,
      NewArtist(..),
@@ -54,6 +55,7 @@ module Gramophone.Core.Database
 
      Recording(..),
      RecordingID(),
+     getAllRecordings,
      findRecordings,
      getRecording,
      NewRecording(..),
@@ -365,6 +367,12 @@ getArtist :: MonadDB m => ArtistID -> m Artist
 getArtist (Id i) = do
   [[name]] <- queryDB "SELECT name FROM artists WHERE id = ?;" [convert i]
   return $ Artist (Id i) (convert name)
+  
+-- |Returns a list containing the ArtistID of every artist in the database
+getAllArtists :: MonadDB m => m [ArtistID]
+getAllArtists = do
+  [ids] <- queryDB "SELECT id FROM artists;" []
+  return $ map convert ids
 
 -- |An artist which may not yet have been added to the database.
 data NewArtist = NewArtist ArtistName
@@ -425,6 +433,13 @@ getRecording recordingID = do
     artist <- mapM getArtist artistID
     album <- mapM getAlbum albumID
     return $ Recording recordingID file title artist album trackNumber
+    
+-- |Returns a list containing the ArtistID of every artist in the database
+getAllRecordings :: MonadDB m => m [RecordingID]
+getAllRecordings = do
+  r <- queryDB "SELECT id FROM recordings;" []
+  return $ map (convert . head) r
+
 
 -- |A recording which may not yet have been added to the database
 data NewRecording = NewRecording AudioFileName (Maybe RecordingTitle) (Maybe ArtistID) (Maybe AlbumID) (Maybe TrackNumber)
