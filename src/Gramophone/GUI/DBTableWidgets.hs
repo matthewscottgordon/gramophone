@@ -16,11 +16,14 @@
     along with Gramophone.  If not, see <http://www.gnu.org/licenses/>.
 -}
 
-{-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Gramophone.GUI.DBTableWidgets
        (
-         recordingTableWidget
+         recordingTableWidget,
+         titleColumn,
+         trackNumberColumn,
+         fileColumn
        ) where
 
 import Gramophone.Core
@@ -29,6 +32,7 @@ import Gramophone.GUI.Foundation
 import Data.Text (Text)
 import Yesod (newIdent, whamlet)
 import Text.Blaze (ToMarkup(..))
+import Text.Blaze.Html(Html(..))
 
 instance ToMarkup TrackNumber where
   toMarkup (TrackNumber n) = toMarkup n
@@ -39,25 +43,32 @@ instance ToMarkup RecordingTitle where
 instance ToMarkup AudioFileName where
   toMarkup (AudioFileName s) = toMarkup s
   
-maybeField :: ToMarkup a => Maybe a -> Widget
-maybeField v = [whamlet|
-                  $maybe n <- v
-                    <td>#{n}
-                  $nothing
-                    <td>|]
+maybeToHtml :: ToMarkup a => Maybe a -> Html
+maybeToHtml (Just v) = toMarkup v
+maybeToHtml Nothing = toMarkup ""
 
 
-recordingTableWidget :: [Recording] -> Widget
-recordingTableWidget recordings = do
+data RecordingColumn = RecordingColumn {
+  columnTitle :: Html,
+  valueGetter :: Recording -> Html }
+
+makeRecordingColumn :: (ToMarkup a, ToMarkup b) => a -> (Recording -> b) -> RecordingColumn
+makeRecordingColumn a f = RecordingColumn (toMarkup a) (toMarkup . f)
+
+titleColumn = makeRecordingColumn "Title" (maybeToHtml . recordingTitle)
+trackNumberColumn = makeRecordingColumn (preEscapedToMarkup "Track&nbsp;#") (maybeToHtml . recordingTrackNumber)
+fileColumn = makeRecordingColumn "File" recordingFile
+
+
+recordingTableWidget :: [RecordingColumn] -> [Recording] -> Widget
+recordingTableWidget cs rs = do
   recordingListID <- newIdent
   [whamlet|
     <table id="#{recordingListID}">
       <tr>
-        <th>Title
-        <th>Track&nbsp;# 
-        <th>File
-      $forall recording <- recordings
-        <tr>
-          ^{maybeField (recordingTitle recording)}
-          ^{maybeField (recordingTrackNumber recording)}
-          <td>#{recordingFile recording}|]
+        $forall c <- cs
+           <th>#{columnTitle c}      
+        $forall r <- rs
+          <tr>
+            $forall c <- cs
+              <td>^{valueGetter c r}|]

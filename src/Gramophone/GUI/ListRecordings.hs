@@ -34,5 +34,5 @@ getListRecordingsR = defaultLayout $ do
   recordings <- withDatabase $ do
     ids <- getAllRecordings
     mapM getRecording ids
-  recordingTableWidget recordings
+  recordingTableWidget [titleColumn, trackNumberColumn, fileColumn] recordings
   [whamlet|<div><a href=@{TestR}>Back to testing functions</a>|]
