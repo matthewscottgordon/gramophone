@@ -20,10 +20,21 @@
 
 module Gramophone.GUI.DBTableWidgets
        (
-         recordingTableWidget,
-         titleColumn,
-         trackNumberColumn,
-         fileColumn
+         dbTableWidget,
+         
+         recordingTitleColumn,
+         recordingTrackNumberColumn,
+         recordingFileColumn,
+         recordingArtistNameColumn,
+         recordingAlbumTitleColumn,
+         recordingAlbumArtistNameColumn,
+         recordingAlbumTrackCountColumn,
+         
+         albumTitleColumn,
+         albumArtistNameColumn,
+         albumTrackCountColumn,
+         
+         artistNameColumn
        ) where
 
 import Gramophone.Core
@@ -34,34 +45,22 @@ import Yesod (newIdent, whamlet)
 import Text.Blaze (ToMarkup(..))
 import Text.Blaze.Html(Html(..))
 
-instance ToMarkup TrackNumber where
-  toMarkup (TrackNumber n) = toMarkup n
+import Control.Monad ((<=<))
 
-instance ToMarkup RecordingTitle where
-  toMarkup (RecordingTitle t) = toMarkup t
-
-instance ToMarkup AudioFileName where
-  toMarkup (AudioFileName s) = toMarkup s
   
 maybeToHtml :: ToMarkup a => Maybe a -> Html
 maybeToHtml (Just v) = toMarkup v
 maybeToHtml Nothing = toMarkup ""
 
-
-data RecordingColumn = RecordingColumn {
+data Column a = Column {
   columnTitle :: Html,
-  valueGetter :: Recording -> Html }
+  valueGetter :: a -> Html }
 
-makeRecordingColumn :: (ToMarkup a, ToMarkup b) => a -> (Recording -> b) -> RecordingColumn
-makeRecordingColumn a f = RecordingColumn (toMarkup a) (toMarkup . f)
+makeColumn :: (ToMarkup a, ToMarkup b) => a -> (c -> b) -> Column c
+makeColumn a f = Column (toMarkup a) (toMarkup .f)
 
-titleColumn = makeRecordingColumn "Title" (maybeToHtml . recordingTitle)
-trackNumberColumn = makeRecordingColumn (preEscapedToMarkup "Track&nbsp;#") (maybeToHtml . recordingTrackNumber)
-fileColumn = makeRecordingColumn "File" recordingFile
-
-
-recordingTableWidget :: [RecordingColumn] -> [Recording] -> Widget
-recordingTableWidget cs rs = do
+dbTableWidget :: [Column a] -> [a] -> Widget
+dbTableWidget cs rs = do
   recordingListID <- newIdent
   [whamlet|
     <table id="#{recordingListID}">
@@ -72,3 +71,39 @@ recordingTableWidget cs rs = do
           <tr>
             $forall c <- cs
               <td>^{valueGetter c r}|]
+
+
+
+instance ToMarkup TrackNumber where
+  toMarkup (TrackNumber n) = toMarkup n
+
+instance ToMarkup RecordingTitle where
+  toMarkup (RecordingTitle t) = toMarkup t
+
+instance ToMarkup AudioFileName where
+  toMarkup (AudioFileName s) = toMarkup s
+                
+recordingTitleColumn = makeColumn "Title" (maybeToHtml . recordingTitle)
+recordingTrackNumberColumn = makeColumn (preEscapedToMarkup "Track&nbsp;#") (maybeToHtml . recordingTrackNumber)
+recordingFileColumn = makeColumn "File" recordingFile
+recordingArtistNameColumn = makeColumn "Artist" (maybeToHtml . (fmap artistName) . recordingArtist)
+recordingAlbumTitleColumn = makeColumn "Album" (maybeToHtml . (fmap albumTitle) . recordingAlbum)
+recordingAlbumArtistNameColumn = makeColumn "Album Artist" (maybeToHtml . (fmap artistName) . (albumArtist <=< recordingAlbum))
+recordingAlbumTrackCountColumn = makeColumn "Album # Tracks" (maybeToHtml . (fmap albumTrackCount) . recordingAlbum)
+
+
+instance ToMarkup AlbumTitle where
+  toMarkup (AlbumTitle t) = toMarkup t
+  
+instance ToMarkup TrackCount where
+  toMarkup (TrackCount c) = toMarkup c
+  
+albumTitleColumn = makeColumn "Title" albumTitle
+albumArtistNameColumn = makeColumn "Artist" (maybeToHtml . (fmap artistName) . albumArtist)
+albumTrackCountColumn = makeColumn "Track Count" albumTrackCount
+
+    
+instance ToMarkup ArtistName where
+  toMarkup (ArtistName n) = toMarkup n
+
+artistNameColumn = makeColumn "Name" artistName
