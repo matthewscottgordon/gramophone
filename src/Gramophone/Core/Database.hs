@@ -370,9 +370,8 @@ getArtist (Id i) = do
   
 -- |Returns a list containing the ArtistID of every artist in the database
 getAllArtists :: MonadDB m => m [ArtistID]
-getAllArtists = do
-  [ids] <- queryDB "SELECT id FROM artists;" []
-  return $ map convert ids
+getAllArtists = map (convert . head) <$> queryDB "SELECT id FROM artists;" []
+
 
 -- |An artist which may not yet have been added to the database.
 data NewArtist = NewArtist ArtistName
@@ -436,9 +435,7 @@ getRecording recordingID = do
     
 -- |Returns a list containing the ArtistID of every artist in the database
 getAllRecordings :: MonadDB m => m [RecordingID]
-getAllRecordings = do
-  r <- queryDB "SELECT id FROM recordings;" []
-  return $ map (convert . head) r
+getAllRecordings = map (convert . head) <$> queryDB "SELECT id FROM recordings;" []
 
 
 -- |A recording which may not yet have been added to the database
