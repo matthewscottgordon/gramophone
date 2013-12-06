@@ -30,6 +30,8 @@ import Yesod
 import Gramophone.GUI.Foundation
 import Gramophone.GUI.BrowseForFiles
 import Gramophone.GUI.ListRecordings
+import Gramophone.GUI.ListAlbums
+import Gramophone.GUI.ListArtists
 
 
 mkYesodDispatch "Website" resourcesWebsite
@@ -42,7 +44,9 @@ getTestR = defaultLayout $ do
               <body>
                   <h1>Testing Functions
                   <a href=@{BrowseForFilesR browseFilesStartDir}>Browse for Files
-                  <a href=@{ListRecordingsR}>List Recordings|]
+                  <a href=@{ListRecordingsR}>List Recordings
+                  <a href=@{ListAlbumsR}>List Albums
+                  <a href=@{ListArtistsR}>List Artists|]
 
 
 startGUI :: DB.DatabaseRef -> IO ()

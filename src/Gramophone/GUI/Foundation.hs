@@ -56,6 +56,8 @@ mkYesodData "Website" [parseRoutes|
 /                        TestR GET
 /FileSystem/*RawFilePath BrowseForFilesR GET
 /Recordings              ListRecordingsR GET
+/Albums                  ListAlbumsR GET
+/Artists                 ListArtistsR GET
 |]
 
 instance Yesod Website
