@@ -50,6 +50,7 @@ module Gramophone.Core.Database
      AlbumID(),
      findAlbums,
      getAlbum,
+     getAllAlbums,
      NewAlbum(..),
      addAlbum,
 
@@ -404,6 +405,12 @@ getAlbum albumID = do
     let (title, artistID, numTracks) = convert3 $ head r
     artist <- mapM getArtist artistID
     return $ Album albumID title artist numTracks
+  
+    
+-- |Returns a list containing the AlbumID of every album in the database
+getAllAlbums :: MonadDB m => m [AlbumID]
+getAllAlbums = map (convert . head) <$> queryDB "SELECT id FROM albums;" []
+
 
 -- |An album which may not yet have been added to the database
 data NewAlbum = NewAlbum AlbumTitle (Maybe ArtistID) TrackCount
