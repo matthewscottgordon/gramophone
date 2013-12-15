@@ -83,6 +83,7 @@ import System.Directory (doesFileExist)
 
 import Gramophone.Core.Database.Monad
 import Gramophone.Core.Database.Types
+import Gramophone.Core.Database.Query
 
 
 
@@ -282,7 +283,7 @@ getArtist (Id i) = do
   
 -- |Returns a list containing the ArtistID of every artist in the database
 getAllArtists :: MonadDB m => m [ArtistID]
-getAllArtists = map (convert . head) <$> queryDB "SELECT id FROM artists;" []
+getAllArtists = queryTable NoConstraint
 
 
 -- |An artist which may not yet have been added to the database.
@@ -306,7 +307,7 @@ getNewArtistID = do
   
 -- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums :: MonadDB m => AlbumTitle -> m [Album]
-findAlbums title = mapM (getAlbum . convert1) =<< queryDB "SELECT id FROM albums WHERE title = ?;" [convert title]
+findAlbums title = mapM getAlbum =<< queryTable (EqualsConstraint albumTitleColumn title)
 
 
 -- |Given an AlbumID, retrieve the corresponding Album record from the database.
@@ -320,7 +321,7 @@ getAlbum albumID = do
     
 -- |Returns a list containing the AlbumID of every album in the database
 getAllAlbums :: MonadDB m => m [AlbumID]
-getAllAlbums = map (convert . head) <$> queryDB "SELECT id FROM albums;" []
+getAllAlbums = queryTable NoConstraint
 
 
 -- |An album which may not yet have been added to the database
@@ -343,7 +344,7 @@ addAlbum (NewAlbum title artistID trackCount) = do
     Just <$> getAlbum newID 
 
 -- |Given a RecordingID, retrieve the corresponding Recording from the database.
-getRecording :: MonadDB m => RecordingID -> m Recording
+getRecording :: MonadDB m => (Id Recording) -> m Recording
 getRecording recordingID = do
     r <- queryDB "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
     let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
@@ -352,8 +353,8 @@ getRecording recordingID = do
     return $ Recording recordingID file title artist album trackNumber
     
 -- |Returns a list containing the ArtistID of every artist in the database
-getAllRecordings :: MonadDB m => m [RecordingID]
-getAllRecordings = map (convert . head) <$> queryDB "SELECT id FROM recordings;" []
+getAllRecordings :: MonadDB m => m [Id Recording]
+getAllRecordings = queryTable NoConstraint
 
 
 -- |A recording which may not yet have been added to the database
@@ -377,8 +378,6 @@ addRecording (NewRecording filename title artistID albumID trackNumber) = do
 
 
 findRecordings :: MonadDB m => RecordingTitle -> m [Recording]
-findRecordings title = do
-    rs <- queryDB "SELECT id FROM recordings WHERE title = ?;" [convert title]
-    forM rs (getRecording . convert1)
+findRecordings title = mapM getRecording =<< queryTable (EqualsConstraint recordingTitleColumn (Just title))
 
 

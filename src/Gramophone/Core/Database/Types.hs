@@ -21,10 +21,13 @@
 module Gramophone.Core.Database.Types 
        (
          Id(..),
+         Column(..),
          
          AudioFileName(..),
          RecordingTitle(..),
+         recordingTitleColumn,
          AlbumTitle(..),
+         albumTitleColumn,
          TrackNumber(..),
          TrackCount(..),
          ArtistName(..),
@@ -36,12 +39,15 @@ module Gramophone.Core.Database.Types
          AlbumID(),
 
          Recording(..),
-         RecordingID()
+         RecordingID(),
+         
+         Convertible(..),
+         convert
        ) where
 
 
 import Database.HDBC (SqlValue)
-import Data.Convertible (Convertible(..))
+import Data.Convertible (Convertible(..), convert)
 import Data.Text (Text)
 
 
@@ -134,3 +140,18 @@ instance Convertible SqlValue (Id a) where
 
 instance Convertible (Id a) SqlValue where
      safeConvert (Id val) = safeConvert val
+     
+
+
+data Column t v = Column {
+    columnSqlName :: String,
+    columnGetter :: t -> v,
+    columnSqlValue :: v -> SqlValue
+    }
+                  
+
+recordingTitleColumn :: Column Recording (Maybe RecordingTitle)
+recordingTitleColumn = Column "title" recordingTitle convert
+
+albumTitleColumn :: Column Album AlbumTitle
+albumTitleColumn = Column "title" albumTitle convert
