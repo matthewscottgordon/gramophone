@@ -25,21 +25,24 @@ module Gramophone.Core.Database.Types
          
          AudioFileName(..),
          RecordingTitle(..),
-         recordingTitleColumn,
          AlbumTitle(..),
-         albumTitleColumn,
          TrackNumber(..),
          TrackCount(..),
          ArtistName(..),
 
          Artist(..),
          ArtistID(),
+         artistIdColumn,
 
          Album(..),
          AlbumID(),
+         albumIdColumn,
+         albumTitleColumn,
 
          Recording(..),
          RecordingID(),
+         recordingIdColumn,
+         recordingTitleColumn,
          
          Convertible(..),
          convert
@@ -107,7 +110,7 @@ instance Convertible TrackCount SqlValue where
 
 -- |Record describing an audio file
 data Recording = Recording {
-     recordingId          :: RecordingID,
+     recordingId          :: Id Recording,
      recordingFile        :: AudioFileName,
      recordingTitle       :: Maybe RecordingTitle,
      recordingArtist      :: Maybe Artist,
@@ -120,7 +123,7 @@ type AlbumID = Id Album
 
 -- |Record describing an album
 data Album = Album {
-     albumId         :: AlbumID,
+     albumId         :: Id Album,
      albumTitle      :: AlbumTitle,
      albumArtist     :: Maybe Artist,
      albumTrackCount :: TrackCount
@@ -153,5 +156,14 @@ data Column t v = Column {
 recordingTitleColumn :: Column Recording (Maybe RecordingTitle)
 recordingTitleColumn = Column "title" recordingTitle convert
 
+recordingIdColumn :: Column Recording (Id Recording)
+recordingIdColumn = Column "id" recordingId convert
+
 albumTitleColumn :: Column Album AlbumTitle
 albumTitleColumn = Column "title" albumTitle convert
+
+albumIdColumn :: Column Album (Id Album)
+albumIdColumn = Column "id" albumId convert
+
+artistIdColumn :: Column Artist (Id Artist)
+artistIdColumn = Column "id" artistId convert

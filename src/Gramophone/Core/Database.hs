@@ -277,13 +277,11 @@ findArtists name = (map artistFromSql) <$> queryDB "SELECT id, name FROM artists
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
 getArtist :: MonadDB m => ArtistID -> m Artist
-getArtist (Id i) = do
-  [[name]] <- queryDB "SELECT name FROM artists WHERE id = ?;" [convert i]
-  return $ Artist (Id i) (convert name)
+getArtist = getRow
   
 -- |Returns a list containing the ArtistID of every artist in the database
 getAllArtists :: MonadDB m => m [ArtistID]
-getAllArtists = queryTable NoConstraint
+getAllArtists = queryId NoConstraint
 
 
 -- |An artist which may not yet have been added to the database.
@@ -307,21 +305,17 @@ getNewArtistID = do
   
 -- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums :: MonadDB m => AlbumTitle -> m [Album]
-findAlbums title = mapM getAlbum =<< queryTable (EqualsConstraint albumTitleColumn title)
+findAlbums title = mapM getAlbum =<< queryId (EqualsConstraint albumTitleColumn title)
 
 
 -- |Given an AlbumID, retrieve the corresponding Album record from the database.
 getAlbum :: MonadDB m => AlbumID -> m Album
-getAlbum albumID = do
-    r <- queryDB "SELECT title, artist, num_tracks FROM albums WHERE id = ?;" [convert albumID]
-    let (title, artistID, numTracks) = convert3 $ head r
-    artist <- mapM getArtist artistID
-    return $ Album albumID title artist numTracks
+getAlbum = getRow
   
     
 -- |Returns a list containing the AlbumID of every album in the database
 getAllAlbums :: MonadDB m => m [AlbumID]
-getAllAlbums = queryTable NoConstraint
+getAllAlbums = queryId NoConstraint
 
 
 -- |An album which may not yet have been added to the database
@@ -345,16 +339,11 @@ addAlbum (NewAlbum title artistID trackCount) = do
 
 -- |Given a RecordingID, retrieve the corresponding Recording from the database.
 getRecording :: MonadDB m => (Id Recording) -> m Recording
-getRecording recordingID = do
-    r <- queryDB "SELECT file, title, artist, album, track_number FROM recordings WHERE id = ?;" [convert recordingID]
-    let (file, title, artistID, albumID, trackNumber) = convert5 (head r)
-    artist <- mapM getArtist artistID
-    album <- mapM getAlbum albumID
-    return $ Recording recordingID file title artist album trackNumber
+getRecording = getRow
     
 -- |Returns a list containing the ArtistID of every artist in the database
 getAllRecordings :: MonadDB m => m [Id Recording]
-getAllRecordings = queryTable NoConstraint
+getAllRecordings = queryId NoConstraint
 
 
 -- |A recording which may not yet have been added to the database
@@ -378,6 +367,6 @@ addRecording (NewRecording filename title artistID albumID trackNumber) = do
 
 
 findRecordings :: MonadDB m => RecordingTitle -> m [Recording]
-findRecordings title = mapM getRecording =<< queryTable (EqualsConstraint recordingTitleColumn (Just title))
+findRecordings title = mapM getRecording =<< queryId (EqualsConstraint recordingTitleColumn (Just title))
 
 
