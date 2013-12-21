@@ -55,7 +55,7 @@ import Data.Text (Text)
 
 
 data Id a = Id Integer
-    deriving Show
+    deriving (Read, Show, Eq)
 
 -- |Opaque type containing a unique identifier for a Recording
 type RecordingID = Id Recording
@@ -94,7 +94,7 @@ instance Convertible ArtistName SqlValue where
 
 -- |The track number of a recording within it's album
 newtype TrackNumber = TrackNumber Integer
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 instance Convertible SqlValue TrackNumber where
     safeConvert = (fmap TrackNumber) . safeConvert
 instance Convertible TrackNumber SqlValue where
@@ -102,7 +102,7 @@ instance Convertible TrackNumber SqlValue where
 
 -- |The number of recordings in a album
 newtype TrackCount = TrackCount Integer
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 instance Convertible SqlValue TrackCount where
     safeConvert = (fmap TrackCount) . safeConvert
 instance Convertible TrackCount SqlValue where
