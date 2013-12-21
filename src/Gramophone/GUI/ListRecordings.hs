@@ -35,9 +35,7 @@ getListRecordingsR = defaultLayout $ do
     ids <- getAllRecordings
     mapM getRecording ids
   dbTableWidget [recordingTitleColumn,
-                 recordingTrackNumberColumn,
-                 recordingAlbumTrackCountColumn,
+                 recordingTrackNumberWithCountColumn,
                  recordingArtistNameColumn,
-                 recordingAlbumTitleColumn,
-                 recordingAlbumArtistNameColumn] recordings
+                 recordingAlbumTitleColumn] recordings
   [whamlet|<div><a href=@{TestR}>Back to testing functions</a>|]

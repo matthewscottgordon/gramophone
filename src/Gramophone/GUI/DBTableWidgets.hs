@@ -29,6 +29,7 @@ module Gramophone.GUI.DBTableWidgets
          recordingAlbumTitleColumn,
          recordingAlbumArtistNameColumn,
          recordingAlbumTrackCountColumn,
+         recordingTrackNumberWithCountColumn,
          
          albumTitleColumn,
          albumArtistNameColumn,
@@ -88,8 +89,17 @@ recordingTrackNumberColumn = makeColumn (preEscapedToMarkup "Track&nbsp;#") (may
 recordingFileColumn = makeColumn "File" recordingFile
 recordingArtistNameColumn = makeColumn "Artist" (maybeToHtml . (fmap artistName) . recordingArtist)
 recordingAlbumTitleColumn = makeColumn "Album" (maybeToHtml . (fmap albumTitle) . recordingAlbum)
-recordingAlbumArtistNameColumn = makeColumn "Album Artist" (maybeToHtml . (fmap artistName) . (albumArtist <=< recordingAlbum))
+recordingAlbumArtistNameColumn = makeColumn "Album Artist"
+                                            (maybeToHtml . (fmap artistName) . (albumArtist <=< recordingAlbum))
 recordingAlbumTrackCountColumn = makeColumn "Album # Tracks" (maybeToHtml . (fmap albumTrackCount) . recordingAlbum)
+
+recordingTrackNumberWithCountColumn = makeColumn (preEscapedToMarkup "Track&nbsp;#") format
+  where
+    format r = format' (recordingTrackNumber r) (((fmap albumTrackCount) .recordingAlbum) r)
+    format' (Just t) (Just c) | c > (TrackCount 0) = (toMarkup t) >> (toMarkup " of ") >> (toMarkup c)
+                              | otherwise          = toMarkup t
+    format' (Just t) Nothing                       = toMarkup t
+    format' Nothing Nothing                        = toMarkup ""
 
 
 instance ToMarkup AlbumTitle where
