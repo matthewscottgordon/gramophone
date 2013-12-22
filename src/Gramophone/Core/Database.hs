@@ -276,7 +276,7 @@ findArtists name = (map artistFromSql) <$> queryDB "SELECT id, name FROM artists
   where artistFromSql (idValue:nameValue:[]) = Artist (Id (convert idValue)) (convert nameValue)
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
-getArtist :: MonadDB m => ArtistID -> m Artist
+getArtist :: MonadDB m => ArtistID -> m (Maybe Artist)
 getArtist = getRow
   
 -- |Returns a list containing the ArtistID of every artist in the database
@@ -293,7 +293,7 @@ addArtist (NewArtist name) = do
     newID <- getNewArtistID
     runDB "INSERT INTO artists (id, name) VALUES (?, ?);" [convert newID, convert name]
     commitDB
-    Just <$> getArtist (Id newID)
+    getArtist (Id newID)
 
 -- Returns an Integer that is not currently used as an ArtistID
 getNewArtistID :: MonadDB m => m Integer
@@ -305,11 +305,12 @@ getNewArtistID = do
   
 -- |Given the name of an Album, returns a list of all Album records that have that name.
 findAlbums :: MonadDB m => AlbumTitle -> m [Album]
-findAlbums title = mapM getAlbum =<< queryId (EqualsConstraint albumTitleColumn title)
+findAlbums title = do r <- queryId (EqualsConstraint albumTitleColumn title)
+                      catMaybes <$> mapM getAlbum r
 
 
 -- |Given an AlbumID, retrieve the corresponding Album record from the database.
-getAlbum :: MonadDB m => AlbumID -> m Album
+getAlbum :: MonadDB m => AlbumID -> m (Maybe Album)
 getAlbum = getRow
   
     
@@ -335,10 +336,10 @@ addAlbum (NewAlbum title artistID trackCount) = do
     runDB "INSERT INTO albums (id, title, artist, num_tracks) VALUES (?, ?, ?, ?);"
           [convert newID, convert title, convert artistID, convert trackCount]
     commitDB
-    Just <$> getAlbum newID 
+    getAlbum newID 
 
 -- |Given a RecordingID, retrieve the corresponding Recording from the database.
-getRecording :: MonadDB m => (Id Recording) -> m Recording
+getRecording :: MonadDB m => (Id Recording) -> m (Maybe Recording)
 getRecording = getRow
     
 -- |Returns a list containing the ArtistID of every artist in the database
@@ -363,10 +364,10 @@ addRecording (NewRecording filename title artistID albumID trackNumber) = do
     runDB "INSERT INTO recordings (id, file, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?, ?);"
         [convert newID, convert filename, convert title, convert artistID, convert albumID, convert trackNumber]
     commitDB
-    Just <$> getRecording newID
+    getRecording newID
 
 
 findRecordings :: MonadDB m => RecordingTitle -> m [Recording]
-findRecordings title = mapM getRecording =<< queryId (EqualsConstraint recordingTitleColumn (Just title))
-
+findRecordings title = do r <- queryId (EqualsConstraint recordingTitleColumn (Just title))
+                          catMaybes <$> mapM getRecording r
 

@@ -29,11 +29,14 @@ import Yesod (Html, defaultLayout, whamlet)
 
 import Gramophone.GUI.DBTableWidgets
 
+import Control.Applicative ((<$>))
+import Data.Maybe (catMaybes)
+
 getListAlbumsR :: Handler Html
 getListAlbumsR = defaultLayout $ do
   recordings <- withDatabase $ do
     ids <- getAllAlbums
-    mapM getAlbum ids
+    catMaybes <$> mapM getAlbum ids
   dbTableWidget [albumTitleColumn,
                  albumArtistNameColumn,
                  albumTrackCountColumn] recordings

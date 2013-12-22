@@ -21,7 +21,7 @@
 module Gramophone.Core.Database.Query
        (
          Constraint(..),
-         Table(..),
+         Table(getRow),
          queryId
        )
        where
@@ -51,33 +51,48 @@ data Constraint t v = EqualsConstraint (Column t v) v
 
 class Table t where
   queryTable :: MonadDB m => String -> Constraint t v -> m [[SqlValue]]
-  getRow :: MonadDB m => Id t -> m t
+  getRow :: MonadDB m => Id t -> m (Maybe t)
+  getRowMaybe :: MonadDB m => Maybe (Id t) -> m (Maybe t)
+  getRowMaybe i = case i of
+    Just i' -> getRow i'
+    Nothing -> return Nothing
   
 instance Table Recording where
   queryTable = queryTable' "recordings"
-  getRow i = fromRow =<< (head <$> queryTable "file, title, artist, album, track_number" (EqualsConstraint recordingIdColumn i))
+  getRow i = do
+             r <- queryTable "file, title, artist, album, track_number" (EqualsConstraint recordingIdColumn i)
+             case r of
+               r':_ -> fromRow r'
+               []   -> return Nothing
     where
+      fromRow :: MonadDB m => [SqlValue] -> m (Maybe Recording)
       fromRow (file:title:artistId:albumId:trackNum:[]) = do
-        artist <- mapM getRow (convert artistId)
-        album <- mapM getRow (convert albumId)
-        return $ Recording i (convert file) (convert title) artist album (convert trackNum)
-      fromRow _ = undefined
+        artist <- getRowMaybe (convert artistId)
+        album <- getRowMaybe (convert albumId)
+        return $ Just $ Recording i (convert file) (convert title) artist album (convert trackNum)
+      fromRow _ = return Nothing
   
 instance Table Artist where
   queryTable = queryTable' "artists"
-  getRow i = (fromRow . head) <$> queryTable "name" (EqualsConstraint artistIdColumn i)
+  getRow i = do r <- queryTable "name" (EqualsConstraint artistIdColumn i)
+                return $ case r of
+                  r':_ -> fromRow r'
+                  []   -> Nothing
     where
-      fromRow (name:[]) = Artist i (convert name)
-      from _ = undefined
+      fromRow (name:[]) = Just $ Artist i (convert name)
+      from _ = Nothing
   
 instance Table Album where
   queryTable = queryTable' "albums"
-  getRow i = fromRow =<< (head <$> queryTable "title, artist, num_tracks" (EqualsConstraint albumIdColumn i))
+  getRow i = do r <- queryTable "title, artist, num_tracks" (EqualsConstraint albumIdColumn i)
+                case r of
+                  r':_ -> fromRow r'
+                  []   -> return Nothing
     where
       fromRow (title:artistId:numTracks:[]) = do
-        artist <- mapM getRow (convert artistId)
-        return $ Album i (convert title) artist (convert numTracks)
-      fromRow _ = undefined
+        artist <- getRowMaybe (convert artistId)
+        return $ Just $ Album i (convert title) artist (convert numTracks)
+      fromRow _ = return Nothing
 
 queryId :: (MonadDB m, Table t) => Constraint t v -> m [Id t]
 queryId constraint = map (convert . head) <$> queryTable "id" constraint
