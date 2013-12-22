@@ -18,28 +18,37 @@
 
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 
-module Gramophone.GUI.ListRecordings
+module Gramophone.GUI.AlbumInfo
        (
-         getListRecordingsR
+         getAlbumInfoR
        ) where
 
 import Gramophone.GUI.Foundation
 
-import Yesod (Html, defaultLayout, whamlet)
+import Yesod (Html, defaultLayout, whamlet, notFound)
 
 import Gramophone.GUI.DBTableWidgets
 
-import Control.Applicative ((<$>))
-import Data.Maybe (catMaybes)
-
-
-getListRecordingsR :: Handler Html
-getListRecordingsR = defaultLayout $ do
-  recordings <- withDatabase $ do
-    ids <- getAllRecordings
-    catMaybes <$> mapM getRecording ids
-  dbTableWidget [recordingTitleColumn,
-                 recordingTrackNumberWithCountColumn,
-                 recordingArtistNameColumn,
-                 recordingAlbumTitleColumnWithLink] recordings
+albumInfoWidget :: Album -> Widget
+albumInfoWidget album = 
+  [whamlet|
+   <table>
+     <tr>
+       <th>Title:
+       <td>#{albumTitle album}
+     $maybe artist <- albumArtist album
+       <tr>
+         <th>Artist:
+         <td>#{artistName artist}
+     $if (albumTrackCount album) > (TrackCount 0)
+       <tr>
+         <th>Number of Tracks:
+         <td>#{albumTrackCount album}|]
+     
+getAlbumInfoR :: AlbumID -> Handler Html
+getAlbumInfoR albumID= defaultLayout $ do
+  maybeAlbum <- withDatabase $ getAlbum albumID
+  case maybeAlbum of
+    Just album -> albumInfoWidget album
+    Nothing    -> notFound
   [whamlet|<div><a href=@{TestR}>Back to testing functions</a>|]

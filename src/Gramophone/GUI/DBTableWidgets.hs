@@ -27,6 +27,7 @@ module Gramophone.GUI.DBTableWidgets
          recordingFileColumn,
          recordingArtistNameColumn,
          recordingAlbumTitleColumn,
+         recordingAlbumTitleColumnWithLink,
          recordingAlbumArtistNameColumn,
          recordingAlbumTrackCountColumn,
          recordingTrackNumberWithCountColumn,
@@ -42,12 +43,17 @@ import Gramophone.Core
 import Gramophone.GUI.Foundation
 
 import Data.Text (Text)
-import Yesod (newIdent, whamlet)
+import Yesod (newIdent, whamlet, Route())
 import Text.Blaze (ToMarkup(..))
 import Text.Blaze.Html(Html(..))
 
 import Control.Monad ((<=<))
 
+
+maybeAp :: Maybe (a -> Maybe b) -> a -> Maybe b
+maybeAp f' v = case f' of
+  Just f -> f v
+  Nothing -> Nothing
   
 maybeToHtml :: ToMarkup a => Maybe a -> Html
 maybeToHtml (Just v) = toMarkup v
@@ -55,10 +61,14 @@ maybeToHtml Nothing = toMarkup ""
 
 data Column a = Column {
   columnTitle :: Html,
-  valueGetter :: a -> Html }
+  valueGetter :: a -> Html, 
+  linkGetter  :: Maybe (a -> Maybe (Route Website)) }
 
 makeColumn :: (ToMarkup a, ToMarkup b) => a -> (c -> b) -> Column c
-makeColumn a f = Column (toMarkup a) (toMarkup .f)
+makeColumn a f = Column (toMarkup a) (toMarkup .f) Nothing
+
+addLink :: Column a -> Maybe (a -> Maybe (Route Website)) -> Column a
+addLink (Column t v _) l = Column t v l
 
 dbTableWidget :: [Column a] -> [a] -> Widget
 dbTableWidget cs rs = do
@@ -71,7 +81,12 @@ dbTableWidget cs rs = do
         $forall r <- rs
           <tr>
             $forall c <- cs
-              <td>^{valueGetter c r}|]
+              $with text <-  valueGetter c r
+                $maybe link <- maybeAp (linkGetter c) r
+                  <td>
+                    <a href=@{link}>^{text}
+                $nothing
+                  <td>^{text}|]
 
 
 
@@ -89,6 +104,8 @@ recordingTrackNumberColumn = makeColumn (preEscapedToMarkup "Track&nbsp;#") (may
 recordingFileColumn = makeColumn "File" recordingFile
 recordingArtistNameColumn = makeColumn "Artist" (maybeToHtml . (fmap artistName) . recordingArtist)
 recordingAlbumTitleColumn = makeColumn "Album" (maybeToHtml . (fmap albumTitle) . recordingAlbum)
+recordingAlbumTitleColumnWithLink =
+  recordingAlbumTitleColumn `addLink` (Just $ (fmap (AlbumInfoR . albumId)) . recordingAlbum)
 recordingAlbumArtistNameColumn = makeColumn "Album Artist"
                                             (maybeToHtml . (fmap artistName) . (albumArtist <=< recordingAlbum))
 recordingAlbumTrackCountColumn = makeColumn "Album # Tracks" (maybeToHtml . (fmap albumTrackCount) . recordingAlbum)

@@ -31,6 +31,7 @@ import Gramophone.GUI.Foundation
 import Gramophone.GUI.BrowseForFiles
 import Gramophone.GUI.ListRecordings
 import Gramophone.GUI.ListAlbums
+import Gramophone.GUI.AlbumInfo
 import Gramophone.GUI.ListArtists
 
 

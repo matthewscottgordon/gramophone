@@ -27,11 +27,12 @@ module Gramophone.GUI.Foundation
 
 import Yesod
 
-import qualified Gramophone.Core.Database as DB
 import Gramophone.Core hiding (withDatabase)
+import qualified Gramophone.Core (withDatabase)
 
 import System.FilePath as FilePath
 import qualified Data.Text as T
+import Numeric (showHex,readHex)
 
 
 data RawFilePath = RawFilePath FilePath.FilePath
@@ -45,18 +46,23 @@ instance PathMultiPiece RawFilePath where
                               then Just $ RawFilePath filePath
                               else Nothing
 
+instance PathPiece (Id a) where
+  toPathPiece = rowIdToText
+  fromPathPiece = textToRowId
+
 data Website = Website DatabaseRef
 
 withDatabase :: (MonadHandler m, HandlerSite m ~ Website) => DBT m b -> m b
 withDatabase f = do
   Website dbr <- getYesod
-  DB.withDatabase dbr f
+  Gramophone.Core.withDatabase dbr f
 
 mkYesodData "Website" [parseRoutes|
 /                        TestR GET
 /FileSystem/*RawFilePath BrowseForFilesR GET
 /Recordings              ListRecordingsR GET
 /Albums                  ListAlbumsR GET
+/Albums/#AlbumID         AlbumInfoR GET
 /Artists                 ListArtistsR GET
 |]
 
