@@ -37,6 +37,8 @@ module Gramophone.Core.Database
      MonadDB,
      DBT,
      withDatabase,
+     
+     Id(),
 
      Artist(..),
      ArtistID(),
@@ -60,7 +62,10 @@ module Gramophone.Core.Database
      findRecordings,
      getRecording,
      NewRecording(..),
-     addRecording
+     addRecording,
+     
+     textToRowId,
+     rowIdToText
     ) where
 
 import Prelude hiding (mapM)

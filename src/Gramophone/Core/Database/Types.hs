@@ -35,27 +35,41 @@ module Gramophone.Core.Database.Types
          artistIdColumn,
 
          Album(..),
-         AlbumID(),
+         AlbumID(..),
          albumIdColumn,
          albumTitleColumn,
 
          Recording(..),
-         RecordingID(),
+         RecordingID(..),
          recordingIdColumn,
          recordingTitleColumn,
          
          Convertible(..),
-         convert
+         convert,
+         
+         rowIdToText,
+         textToRowId
        ) where
 
 
 import Database.HDBC (SqlValue)
 import Data.Convertible (Convertible(..), convert)
 import Data.Text (Text)
+import qualified Data.Text as Text
+import Numeric (showHex, readHex)
 
 
 data Id a = Id Integer
     deriving (Read, Show, Eq)
+             
+rowIdToText :: Id a -> Text
+rowIdToText (Id i) = Text.pack $ showHex i ""
+
+textToRowId :: Text -> Maybe (Id a)
+textToRowId t = case readHex $ Text.unpack t of
+  (i,""):_  -> Just $ Id i
+  otherwise -> Nothing
+
 
 -- |Opaque type containing a unique identifier for a Recording
 type RecordingID = Id Recording
