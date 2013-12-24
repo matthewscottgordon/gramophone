@@ -43,6 +43,7 @@ module Gramophone.Core.Database.Types
          RecordingID(..),
          recordingIdColumn,
          recordingTitleColumn,
+         recordingAlbumColumn,
          
          Convertible(..),
          convert,
@@ -172,6 +173,9 @@ recordingTitleColumn = Column "title" recordingTitle convert
 
 recordingIdColumn :: Column Recording (Id Recording)
 recordingIdColumn = Column "id" recordingId convert
+
+recordingAlbumColumn :: Column Recording (Maybe (Id Album))
+recordingAlbumColumn = Column "album" ((fmap albumId) . recordingAlbum) convert
 
 albumTitleColumn :: Column Album AlbumTitle
 albumTitleColumn = Column "title" albumTitle convert

@@ -60,6 +60,7 @@ module Gramophone.Core.Database
      RecordingID(),
      getAllRecordings,
      findRecordings,
+     getRecordingsFromAlbum,
      getRecording,
      NewRecording(..),
      addRecording,
@@ -375,4 +376,8 @@ addRecording (NewRecording filename title artistID albumID trackNumber) = do
 findRecordings :: MonadDB m => RecordingTitle -> m [Recording]
 findRecordings title = do r <- queryId (EqualsConstraint recordingTitleColumn (Just title))
                           catMaybes <$> mapM getRecording r
+                          
+getRecordingsFromAlbum :: MonadDB m => AlbumID -> m [Recording]
+getRecordingsFromAlbum album = do r <- queryId (EqualsConstraint recordingAlbumColumn (Just album))
+                                  catMaybes <$> mapM getRecording r
 
