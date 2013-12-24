@@ -51,4 +51,8 @@ getAlbumInfoR albumID= defaultLayout $ do
   case maybeAlbum of
     Just album -> albumInfoWidget album
     Nothing    -> notFound
+  recordings <- withDatabase $ getRecordingsFromAlbum albumID
+  dbTableWidget [recordingTitleColumn,
+                 recordingTrackNumberWithCountColumn,
+                 recordingArtistNameColumn ] recordings
   [whamlet|<div><a href=@{TestR}>Back to testing functions</a>|]
