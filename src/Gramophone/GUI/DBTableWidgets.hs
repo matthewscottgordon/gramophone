@@ -16,7 +16,7 @@
     along with Gramophone.  If not, see <http://www.gnu.org/licenses/>.
 -}
 
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE QuasiQuotes, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 
 module Gramophone.GUI.DBTableWidgets
        (
@@ -90,15 +90,14 @@ dbTableWidget cs rs = do
 
 
 
-instance ToMarkup TrackNumber where
-  toMarkup (TrackNumber n) = toMarkup n
-
-instance ToMarkup RecordingTitle where
-  toMarkup (RecordingTitle t) = toMarkup t
-
-instance ToMarkup AudioFileName where
-  toMarkup (AudioFileName s) = toMarkup s
+deriving instance ToMarkup TrackNumber
+deriving instance ToMarkup RecordingTitle
+deriving instance ToMarkup AudioFileName
+deriving instance ToMarkup AlbumTitle
+deriving instance ToMarkup TrackCount
+deriving instance ToMarkup ArtistName
                 
+  
 recordingTitleColumn = makeColumn "Title" (maybeToHtml . recordingTitle)
 recordingTrackNumberColumn = makeColumn (preEscapedToMarkup "Track&nbsp;#") (maybeToHtml . recordingTrackNumber)
 recordingFileColumn = makeColumn "File" recordingFile
@@ -119,18 +118,10 @@ recordingTrackNumberWithCountColumn = makeColumn (preEscapedToMarkup "Track&nbsp
     format' Nothing Nothing                        = toMarkup ""
 
 
-instance ToMarkup AlbumTitle where
-  toMarkup (AlbumTitle t) = toMarkup t
-  
-instance ToMarkup TrackCount where
-  toMarkup (TrackCount c) = toMarkup c
   
 albumTitleColumn = makeColumn "Title" albumTitle
 albumArtistNameColumn = makeColumn "Artist" (maybeToHtml . (fmap artistName) . albumArtist)
 albumTrackCountColumn = makeColumn "Track Count" albumTrackCount
 
-    
-instance ToMarkup ArtistName where
-  toMarkup (ArtistName n) = toMarkup n
 
 artistNameColumn = makeColumn "Name" artistName
