@@ -16,7 +16,8 @@
     along with Gramophone.  If not, see <http://www.gnu.org/licenses/>.
 -}
 
-{-# LANGUAGE  OverloadedStrings, MultiParamTypeClasses #-}
+{-# LANGUAGE  OverloadedStrings, DefaultSignatures, GeneralizedNewtypeDeriving, 
+              FlexibleContexts, FlexibleInstances #-}
 
 module Gramophone.Core.Database.Types 
        (
@@ -45,24 +46,59 @@ module Gramophone.Core.Database.Types
          recordingTitleColumn,
          recordingAlbumColumn,
          
-         Convertible(..),
-         convert,
-         
          rowIdToText,
-         textToRowId
+         textToRowId,
+         
+         ConvertSqlValue(..)
        ) where
 
 
-import Database.HDBC (SqlValue)
-import Data.Convertible (Convertible(..), convert)
+import Database.HDBC (SqlValue(SqlNull))
+import Data.Convertible (Convertible(..), convert, ConvertError(..))
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Numeric (showHex, readHex)
 
 
+class ConvertSqlValue a where
+  toSqlValue :: a -> SqlValue
+  fromSqlValue :: SqlValue -> a
+  maybeToSqlValue :: Maybe a -> SqlValue
+  maybeFromSqlValue :: SqlValue -> Maybe a
+  
+  default toSqlValue :: Convertible a SqlValue => a -> SqlValue
+  toSqlValue = convert
+  
+  default fromSqlValue :: Convertible SqlValue a => SqlValue -> a
+  fromSqlValue = convert
+  
+  default maybeToSqlValue :: Convertible a SqlValue => Maybe a -> SqlValue
+  maybeToSqlValue = convert
+  
+  default maybeFromSqlValue :: Convertible SqlValue a => SqlValue -> Maybe a
+  maybeFromSqlValue = convert
+
+instance ConvertSqlValue Integer
+instance ConvertSqlValue Text
+instance ConvertSqlValue String
+
 data Id a = Id Integer
     deriving (Read, Show, Eq)
              
+unwrapMaybeId :: Maybe (Id a) -> Maybe Integer
+unwrapMaybeId (Just (Id i)) = Just i
+unwrapMaybeId Nothing       = Nothing
+
+instance ConvertSqlValue (Id a) where
+  toSqlValue (Id i) = convert i
+  fromSqlValue = Id . convert
+  maybeToSqlValue = convert . unwrapMaybeId
+  maybeFromSqlValue = f . convert
+    where
+      f :: Maybe Integer -> Maybe (Id a)
+      f (Just i) = Just $ Id i
+      f Nothing = Nothing
+            
 rowIdToText :: Id a -> Text
 rowIdToText (Id i) = Text.pack $ showHex i ""
 
@@ -77,51 +113,27 @@ type RecordingID = Id Recording
 
 -- |The name of an audio file
 newtype AudioFileName = AudioFileName FilePath
-    deriving (Show, Eq)
-instance Convertible SqlValue AudioFileName where
-    safeConvert = (fmap AudioFileName) . safeConvert
-instance Convertible AudioFileName SqlValue where
-     safeConvert (AudioFileName a) = safeConvert a
+    deriving (Show, Eq, ConvertSqlValue)
 
 -- |The title of a recording
 newtype RecordingTitle = RecordingTitle Text
-    deriving (Show, Eq)
-instance Convertible SqlValue RecordingTitle where
-    safeConvert = (fmap RecordingTitle) . safeConvert
-instance Convertible RecordingTitle SqlValue where
-     safeConvert (RecordingTitle a) = safeConvert a
+    deriving (Show, Eq, ConvertSqlValue)
 
 -- |The title of an album
 newtype AlbumTitle = AlbumTitle Text
-    deriving (Show, Eq)
-instance Convertible SqlValue AlbumTitle where
-    safeConvert = (fmap AlbumTitle) . safeConvert
-instance Convertible AlbumTitle SqlValue where
-     safeConvert (AlbumTitle a) = safeConvert a
+    deriving (Show, Eq, ConvertSqlValue)
 
 -- |The name of an artist
 newtype ArtistName = ArtistName Text
-    deriving (Show, Eq)
-instance Convertible SqlValue ArtistName where
-    safeConvert = (fmap ArtistName) . safeConvert
-instance Convertible ArtistName SqlValue where
-     safeConvert (ArtistName a) = safeConvert a
+    deriving (Show, Eq, ConvertSqlValue)
 
 -- |The track number of a recording within it's album
 newtype TrackNumber = TrackNumber Integer
-    deriving (Show, Eq, Ord)
-instance Convertible SqlValue TrackNumber where
-    safeConvert = (fmap TrackNumber) . safeConvert
-instance Convertible TrackNumber SqlValue where
-     safeConvert (TrackNumber a) = safeConvert a
+    deriving (Show, Eq, Ord, ConvertSqlValue)
 
 -- |The number of recordings in a album
 newtype TrackCount = TrackCount Integer
-    deriving (Show, Eq, Ord)
-instance Convertible SqlValue TrackCount where
-    safeConvert = (fmap TrackCount) . safeConvert
-instance Convertible TrackCount SqlValue where
-     safeConvert (TrackCount a) = safeConvert a
+    deriving (Show, Eq, Ord, ConvertSqlValue)
 
 -- |Record describing an audio file
 data Recording = Recording {
@@ -152,12 +164,6 @@ data Artist = Artist {
      artistId   :: ArtistID,
      artistName :: ArtistName
 } deriving Show
-
-instance Convertible SqlValue (Id a) where
-     safeConvert = (fmap Id) . safeConvert
-
-instance Convertible (Id a) SqlValue where
-     safeConvert (Id val) = safeConvert val
      
 
 
@@ -169,19 +175,19 @@ data Column t v = Column {
                   
 
 recordingTitleColumn :: Column Recording (Maybe RecordingTitle)
-recordingTitleColumn = Column "title" recordingTitle convert
+recordingTitleColumn = Column "title" recordingTitle maybeToSqlValue
 
 recordingIdColumn :: Column Recording (Id Recording)
-recordingIdColumn = Column "id" recordingId convert
+recordingIdColumn = Column "id" recordingId toSqlValue
 
 recordingAlbumColumn :: Column Recording (Maybe (Id Album))
-recordingAlbumColumn = Column "album" ((fmap albumId) . recordingAlbum) convert
+recordingAlbumColumn = Column "album" ((fmap albumId) . recordingAlbum) maybeToSqlValue
 
 albumTitleColumn :: Column Album AlbumTitle
-albumTitleColumn = Column "title" albumTitle convert
+albumTitleColumn = Column "title" albumTitle toSqlValue
 
 albumIdColumn :: Column Album (Id Album)
-albumIdColumn = Column "id" albumId convert
+albumIdColumn = Column "id" albumId toSqlValue
 
 artistIdColumn :: Column Artist (Id Artist)
-artistIdColumn = Column "id" artistId convert
+artistIdColumn = Column "id" artistId toSqlValue

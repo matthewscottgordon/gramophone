@@ -67,9 +67,9 @@ instance Table Recording where
     where
       fromRow :: MonadDB m => [SqlValue] -> m (Maybe Recording)
       fromRow (file:title:artistId:albumId:trackNum:[]) = do
-        artist <- getRowMaybe (convert artistId)
-        album <- getRowMaybe (convert albumId)
-        return $ Just $ Recording i (convert file) (convert title) artist album (convert trackNum)
+        artist <- getRowMaybe (maybeFromSqlValue artistId)
+        album <- getRowMaybe (maybeFromSqlValue albumId)
+        return $ Just $ Recording i (fromSqlValue file) (maybeFromSqlValue title) artist album (maybeFromSqlValue trackNum)
       fromRow _ = return Nothing
   
 instance Table Artist where
@@ -79,7 +79,7 @@ instance Table Artist where
                   r':_ -> fromRow r'
                   []   -> Nothing
     where
-      fromRow (name:[]) = Just $ Artist i (convert name)
+      fromRow (name:[]) = Just $ Artist i (fromSqlValue name)
       from _ = Nothing
   
 instance Table Album where
@@ -90,12 +90,12 @@ instance Table Album where
                   []   -> return Nothing
     where
       fromRow (title:artistId:numTracks:[]) = do
-        artist <- getRowMaybe (convert artistId)
-        return $ Just $ Album i (convert title) artist (convert numTracks)
+        artist <- getRowMaybe (maybeFromSqlValue artistId)
+        return $ Just $ Album i (fromSqlValue title) artist (fromSqlValue numTracks)
       fromRow _ = return Nothing
 
 queryId :: (MonadDB m, Table t) => Constraint t v -> m [Id t]
-queryId constraint = map (convert . head) <$> queryTable "id" constraint
+queryId constraint = map (fromSqlValue . head) <$> queryTable "id" constraint
     
 queryTable' ::  (MonadDB m, Table t) => String -> String -> Constraint t v -> m [[SqlValue]]
 queryTable' table columns constraint = q (select columns table) constraint 

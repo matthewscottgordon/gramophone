@@ -16,7 +16,7 @@
     along with Gramophone.  If not, see <http://www.gnu.org/licenses/>.
 -}
 
-{-# LANGUAGE  OverloadedStrings, MultiParamTypeClasses #-}
+{-# LANGUAGE  OverloadedStrings #-}
 
 -- |Create and manage the main Gramophone database.
 module Gramophone.Core.Database 
@@ -83,35 +83,13 @@ import Control.Error
 import Control.Applicative
 import Data.Traversable
 
-import Data.Convertible
+import Data.Convertible (convert)
 
 import System.Directory (doesFileExist)
 
 import Gramophone.Core.Database.Monad
 import Gramophone.Core.Database.Types
 import Gramophone.Core.Database.Query
-
-
-
--- Convenience functions for unpacking a [SqlValue]
-convert1 :: Convertible a b => [a] -> b
-convert1 (a:_) = convert a
-
-convert2 :: Convertible a b => Convertible a c => [a] -> (b, c)
-convert2 (a:b:_) = (convert a, convert b)
-
-convert3 :: Convertible a b => Convertible a c => Convertible a d => [a] -> (b, c, d)
-convert3 (a:b:c:_) = (convert a, convert b, convert c)
-
-convert4 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => [a] -> (b, c, d, e)
-convert4 (a:b:c:d:_) = (convert a, convert b, convert c, convert d)
-
-convert5 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => Convertible a f => [a] -> (b, c, d, e, f)
-convert5 (a:b:c:d:e:_) = (convert a, convert b, convert c, convert d, convert e)
-
-convert6 :: Convertible a b => Convertible a c => Convertible a d => Convertible a e => Convertible a f => Convertible a g =>
-            [a] -> (b, c, d, e, f, g)
-convert6 (a:b:c:d:e:f:_) = (convert a, convert b, convert c, convert d, convert e, convert f)
 
 
 databaseMagic :: Text
@@ -278,8 +256,8 @@ commitDB = do
 
 -- |Given the name of an artist, returns a list of all Artist records that match that name exactly.
 findArtists :: MonadDB m => ArtistName -> m [Artist]
-findArtists name = (map artistFromSql) <$> queryDB "SELECT id, name FROM artists WHERE name = ?;" [convert name]
-  where artistFromSql (idValue:nameValue:[]) = Artist (Id (convert idValue)) (convert nameValue)
+findArtists name = (map artistFromSql) <$> queryDB "SELECT id, name FROM artists WHERE name = ?;" [toSqlValue name]
+  where artistFromSql (idValue:nameValue:[]) = Artist (Id (fromSqlValue idValue)) (fromSqlValue nameValue)
 
 -- |Given an ArtistID, retrieves the Artist record from the database.
 getArtist :: MonadDB m => ArtistID -> m (Maybe Artist)
@@ -297,7 +275,7 @@ data NewArtist = NewArtist ArtistName
 addArtist :: MonadDB m => NewArtist -> m (Maybe Artist)
 addArtist (NewArtist name) = do
     newID <- getNewArtistID
-    runDB "INSERT INTO artists (id, name) VALUES (?, ?);" [convert newID, convert name]
+    runDB "INSERT INTO artists (id, name) VALUES (?, ?);" [toSqlValue newID, toSqlValue name]
     commitDB
     getArtist (Id newID)
 
@@ -340,7 +318,7 @@ addAlbum :: MonadDB m => NewAlbum -> m (Maybe Album)
 addAlbum (NewAlbum title artistID trackCount) = do
     newID <- getNewAlbumID
     runDB "INSERT INTO albums (id, title, artist, num_tracks) VALUES (?, ?, ?, ?);"
-          [convert newID, convert title, convert artistID, convert trackCount]
+          [toSqlValue newID, toSqlValue title, maybeToSqlValue artistID, toSqlValue trackCount]
     commitDB
     getAlbum newID 
 
@@ -368,7 +346,7 @@ addRecording :: MonadDB m => NewRecording -> m (Maybe Recording)
 addRecording (NewRecording filename title artistID albumID trackNumber) = do
     newID <- Id <$> getNewRecordingID
     runDB "INSERT INTO recordings (id, file, title, artist, album, track_number) VALUES (?, ?, ?, ?, ?, ?);"
-        [convert newID, convert filename, convert title, convert artistID, convert albumID, convert trackNumber]
+        [toSqlValue newID, toSqlValue filename, maybeToSqlValue title, maybeToSqlValue artistID, maybeToSqlValue albumID, maybeToSqlValue trackNumber]
     commitDB
     getRecording newID
 
