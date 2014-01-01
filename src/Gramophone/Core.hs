@@ -35,7 +35,7 @@ module Gramophone.Core
     ) where
 
 import qualified Gramophone.Core.MediaController as MC
-import Gramophone.Core.MediaController (MediaController, initMediaController)
+import Gramophone.Core.MediaController (TagReader, initTagReader)
 import Gramophone.Core.Database
 
 import System.FilePath((</>))
@@ -75,7 +75,7 @@ scanDirectoryForAudioFiles :: FilePath -> IO [FilePath]
 scanDirectoryForAudioFiles = (return . concat . fst) <=< (Glob.globDir audioFileGlobs)
 
 
-addAudioFilesFromTree :: MonadDB m => MediaController -> FilePath -> m ()
+addAudioFilesFromTree :: MonadDB m => TagReader -> FilePath -> m ()
 addAudioFilesFromTree mc dir = scanTreeForAudioFiles dir loop
     where loop :: (MonadDB m) => StateT ScanState m ()
           loop = do
@@ -91,7 +91,7 @@ addAudioFilesFromTree mc dir = scanTreeForAudioFiles dir loop
               ScanDone -> return ()
 
 
-addFileToDatabase :: MonadDB m => MediaController -> FilePath -> m (Maybe Recording)
+addFileToDatabase :: MonadDB m => TagReader -> FilePath -> m (Maybe Recording)
 addFileToDatabase mc filename = do
     maybeTags <- liftIO $ MC.readTagsFromFile mc filename
     newRecording <- case maybeTags of

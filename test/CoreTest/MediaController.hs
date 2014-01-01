@@ -67,7 +67,7 @@ aacTestFile = do
 
 testReadTags :: IO TestFile -> Assertion
 testReadTags testFile = do
-    mc <- initMediaController
+    mc <- initTagReader
     (TestFile name expectedTags) <- testFile
     maybeFoundTags <- readTagsFromFile mc name
     case maybeFoundTags of
