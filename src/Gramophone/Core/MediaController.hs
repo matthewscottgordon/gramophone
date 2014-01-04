@@ -23,19 +23,19 @@ module Gramophone.Core.MediaController
      MediaController,
      initMediaController,
      playFile,
-     --getCurrentState,
+     stopPlaying,
+     getStatus,
 
      module Gramophone.Core.MediaController.ReadTagsFromFile
     ) where
 
 import Gramophone.Core.MediaController.ReadTagsFromFile
+import Gramophone.Core.MediaController.CommandMVar
 
 import Control.Concurrent (forkIO)
-import Control.Concurrent.MVar (MVar(..), newEmptyMVar, putMVar, takeMVar)
---import Control.Concurrent.Chan (Chan(..), newChan, readChan)
-import Control.Monad (liftM, liftM2, (>>=), (>=>))
-import Data.Time.Clock (DiffTime(..), secondsToDiffTime, UTCTime(..),
-                        getCurrentTime)
+import Control.Monad (liftM3)
+import Control.Applicative ((<$>))
+import Data.Time.Clock (DiffTime, UTCTime(..), getCurrentTime)
 
 data Track = Track {
     trackFilename    :: FilePath,
@@ -47,71 +47,61 @@ data Track = Track {
 data PlayerState = Playing Track | Stopped
 
 
-data Result = StatusMessage PlayerState UTCTime
-                            | PlayMessage PlayResult
-    
-
-data Command = Play FilePath | Stop | GetStatus
+--data Result = StatusMessage PlayerState UTCTime
+--                            | PlayMessage PlayResult
 
 
-data MediaController =
-  MediaController (MVar Result) (MVar Command)
+--data Command = Play FilePath | Stop | GetStatus
+
+data GenericResult = Success | ErrorMessage String
+
+data PlayCommand = Play FilePath
+
+data StopCommand = Stop
+
+data StatusCommand = GetStatus
+data StatusResult = Status PlayerState UTCTime
 
 
-data MCState = MCState {
-    comms :: MediaController,
-    state :: PlayerState
-  }
-               
-putCommand :: MediaController -> Command -> IO ()
-putCommand (MediaController _ c) = putMVar c
-
-takeCommand :: MCState -> IO Command
-takeCommand  (MCState (MediaController _ c) _) = takeMVar c
-
-putResult :: MCState -> Result -> IO ()
-putResult  (MCState (MediaController r _) _) = putMVar r
-
-takeResult :: MediaController -> IO Result
-takeResult (MediaController r _) = takeMVar r
-
-
-updatePlayerState :: MCState -> PlayerState -> MCState
-updatePlayerState (MCState mc _) s = MCState mc s
+data MediaController = MediaController {
+  playCommand   :: CommandMVar PlayCommand   GenericResult,
+  stopCommand   :: CommandMVar StopCommand   GenericResult,
+  statusCommand :: CommandMVar StatusCommand StatusResult }
 
 initMediaController :: IO MediaController
 initMediaController = do
-  mc <- liftM2 MediaController newEmptyMVar newEmptyMVar
-  forkIO $ mcThread $ MCState mc Stopped
+  mc <- liftM3 MediaController initCommand initCommand initCommand
+  forkIO $ mcThread mc 
   return mc
   
-mcThread :: MCState -> IO ()
-mcThread mcs = do
-  c <- takeCommand mcs
-  (f c >=> mcThread) mcs
-  where
-    f :: Command -> MCState -> IO MCState
-    f (Play file) = playFile' file
-    f Stop        = stopPlaying'
-    f GetStatus   = getStatus'
+mcThread = mcDispatch >> mcThread
+  
+mcDispatch :: MediaController -> IO ()
+mcDispatch mc = do
+  handleCommand' (playCommand mc) (playFile' mc)
+  handleCommand' (stopCommand mc) (stopPlaying' mc)
+  handleCommand' (statusCommand mc) (getStatus' mc)
+    
 
-data PlayResult = PlaySuccess
+playFile :: MediaController -> FilePath -> IO GenericResult
+playFile mc = (invokeCommand (playCommand mc)) . Play 
 
-playFile :: FilePath -> MediaController -> IO PlayResult
-playFile file mc = do
-  putCommand mc (Play file)
-  PlayMessage r' <- takeResult mc
-  return r'
-
-playFile' :: FilePath -> MCState -> IO MCState
-playFile' file mcs  = do
+playFile' :: MediaController -> PlayCommand -> IO GenericResult
+playFile' _ (Play file) = do
   putStrLn ("Playing \"" ++ file ++ "\".")
-  putResult mcs (PlayMessage PlaySuccess)
-  return $ updatePlayerState mcs (Playing (Track file 0 0))
+  return Success
 
-stopPlaying' :: MCState -> IO MCState
-stopPlaying' = (putStrLn "Stopped." >>) . return
 
-getStatus' :: MCState -> IO MCState
-getStatus' mcs@(MCState (MediaController r _) s) =
-  liftM (StatusMessage s) getCurrentTime >>= putMVar r >> return mcs
+stopPlaying :: MediaController -> IO GenericResult
+stopPlaying mc = (invokeCommand (stopCommand mc)) Stop
+
+stopPlaying' :: MediaController -> StopCommand -> IO GenericResult
+stopPlaying' _ _ = putStrLn "Stopped." >> return Success
+
+
+getStatus :: MediaController -> IO StatusResult
+getStatus mc = (invokeCommand (statusCommand mc)) GetStatus
+
+getStatus' :: MediaController -> StatusCommand -> IO StatusResult
+getStatus' _ _ = (Status Stopped) <$> getCurrentTime
+
