@@ -26,8 +26,13 @@ module Gramophone.Core.MediaController.ReadTags
 import Gramophone.Core.MediaController.Types
 import Gramophone.Core.MediaController.Tags
 
+import Prelude hiding (mapM)
+
+import Data.Traversable (mapM)
 import Control.Applicative ((<$>))
-import Control.Lens
+import Control.Monad.Trans.Maybe (MaybeT(..))
+import Control.Monad.Trans (lift)
+import Control.Monad (guard, void)
 import Data.Text
 
 import qualified Media.Streaming.GStreamer as GS
@@ -37,31 +42,27 @@ import qualified System.Glib.Signals as G
 import qualified System.Glib as G
 
 
+
 onNewPadConnectToSink :: GS.Element -> GS.Pad -> IO ()
-onNewPadConnectToSink sink pad = do
-  maybeSinkpad <- GS.elementGetStaticPad sink "sink"
-  case maybeSinkpad of
-    Just sinkpad -> do
-      q <- GS.padIsLinked pad
-      if not q 
-        then do
-          padLinkResult <- GS.padLink pad sinkpad
-          case padLinkResult of
-            GS.PadLinkWrongHierarchy ->
-              putStrLn "Error: PadLinkWrongHierarchy"
-            GS.PadLinkWasLinked      ->
-              putStrLn "Error: PadLinkWasLinked"
-            GS.PadLinkWrongDirection ->
-              putStrLn "Error: PadLinkWrongDirection"
-            GS.PadLinkNoformat       ->
-              putStrLn "Error: PadLinkNoformat"
-            GS.PadLinkNosched        ->
-              putStrLn "Error: PadLinkNosched"
-            GS.PadLinkRefused        ->
-              putStrLn "Error: PadLinkRefused"
-            GS.PadLinkOk             -> return ()
-        else return ()
-    Nothing -> return ()
+onNewPadConnectToSink sink pad = void $ runMaybeT $ do
+  sinkpad <- MaybeT $ GS.elementGetStaticPad sink "sink"
+  linkedAlready <- lift $ GS.padIsLinked pad
+  guard (not linkedAlready)
+  padLinkResult <- lift $ GS.padLink pad sinkpad
+  lift $ case padLinkResult of
+    GS.PadLinkWrongHierarchy ->
+      putStrLn "Error: PadLinkWrongHierarchy"
+    GS.PadLinkWasLinked      ->
+      putStrLn "Error: PadLinkWasLinked"
+    GS.PadLinkWrongDirection ->
+      putStrLn "Error: PadLinkWrongDirection"
+    GS.PadLinkNoformat       ->
+      putStrLn "Error: PadLinkNoformat"
+    GS.PadLinkNosched        ->
+      putStrLn "Error: PadLinkNosched"
+    GS.PadLinkRefused        ->
+      putStrLn "Error: PadLinkRefused"
+    GS.PadLinkOk             -> return ()
 
 
 readTags :: MediaController -> ReadTagsCommand -> IO ReadTagsResult
@@ -69,21 +70,21 @@ readTags _ (ReadTags filePath) = do
   let fileUri = "file://" ++ filePath
   pipe <- GS.pipelineNew fileUri
 
-  Just dec <- GS.elementFactoryMake "uridecodebin" Nothing
-  G.objectSetPropertyString "uri" dec fileUri
-  _ <- GS.binAdd (GS.castToBin pipe) dec
+  maybeBus <- runMaybeT $ do 
+    dec <- MaybeT $ GS.elementFactoryMake "uridecodebin" Nothing
+    lift $ G.objectSetPropertyString "uri" dec fileUri
+    lift $ GS.binAdd (GS.castToBin pipe) dec
+    sink <- MaybeT $ GS.elementFactoryMake "fakesink" Nothing
+    lift $ GS.binAdd (GS.castToBin pipe) sink
+    lift $ G.on dec GS.elementPadAdded $ onNewPadConnectToSink sink
+    lift $ GS.elementSetState pipe GS.StatePaused
+    lift $ GS.elementGetBus pipe
 
-  Just sink <- GS.elementFactoryMake "fakesink" Nothing
-  _ <- GS.binAdd (GS.castToBin pipe) sink
+  eitherTags <- case maybeBus of
+    Just bus -> getTags bus
+    Nothing  -> return (TagsFail "Error constructing bus.")
 
-  _ <- G.on dec GS.elementPadAdded $ onNewPadConnectToSink sink
-
-  _ <- GS.elementSetState pipe GS.StatePaused
-
-  bus<- GS.elementGetBus pipe
-  eitherTags <- getTags bus
-
-  _ <- GS.elementSetState pipe GS.StateNull
+  GS.elementSetState pipe GS.StateNull
 
   return eitherTags
 
