@@ -41,13 +41,14 @@ module Gramophone.Core.MediaController
     ) where
 
 import Gramophone.Core.MediaController.Types
-import qualified Gramophone.Core.MediaController.ReadTagsFromFile as ReadTags
+import Gramophone.Core.MediaController.Tags
+import Gramophone.Core.MediaController.ReadTags
 import Gramophone.Core.MediaController.CommandMVar
 
 import Control.Concurrent (forkIO, yield)
 import Control.Monad (liftM5)
 import Control.Applicative ((<$>))
-import Data.Time.Clock (DiffTime, UTCTime(..), getCurrentTime)
+import Data.Time.Clock (getCurrentTime)
 
 import qualified Media.Streaming.GStreamer as GS
 import qualified System.Glib as G
@@ -116,4 +117,4 @@ readTagsFromFile mc = (invokeCommand (readTagsCommand mc)) . ReadTags
 
 readTagsFromFile' :: MediaController -> 
                      ReadTagsCommand -> IO ReadTagsResult
-readTagsFromFile' = ReadTags.readTagsFromFile
+readTagsFromFile' = readTags

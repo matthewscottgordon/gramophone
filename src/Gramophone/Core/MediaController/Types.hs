@@ -20,15 +20,6 @@
 
 module Gramophone.Core.MediaController.Types
        (
-         Tags(Tags),
-         tagTrackName,
-         tagAlbumName,
-         tagArtistName,
-         tagTrackNumber,
-         tagNumTracks,
-         tagDiscNumber,
-         tagNumDiscs,
-         emptyTags,
          Track(..),
          PlayerState(..),
          GenericResult(..),
@@ -43,28 +34,10 @@ module Gramophone.Core.MediaController.Types
        ) where
          
 import Gramophone.Core.MediaController.CommandMVar
+import Gramophone.Core.MediaController.Tags
 
-import Data.Text
-import Control.Lens
-import Data.Time.Clock (DiffTime, UTCTime(..), getCurrentTime)
+import Data.Time.Clock (DiffTime, UTCTime(..))
 
-
-
-data Tags = Tags {
-      _tagTrackName :: Maybe Text,
-      _tagAlbumName :: Maybe Text,
-      _tagArtistName :: Maybe Text,
-      _tagTrackNumber :: Maybe Integer,
-      _tagNumTracks :: Maybe Integer,
-      _tagDiscNumber :: Maybe Integer,
-      _tagNumDiscs :: Maybe Integer
-}
-
-$(makeLenses ''Tags)
-
-emptyTags :: Tags
-emptyTags = 
-  Tags Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data ReadTagsCommand = ReadTags FilePath
 data ReadTagsResult = TagsSuccess Tags | TagsFail String

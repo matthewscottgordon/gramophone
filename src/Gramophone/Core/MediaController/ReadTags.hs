@@ -18,14 +18,15 @@
 
 {-# LANGUAGE  OverloadedStrings #-}
 
-module Gramophone.Core.MediaController.ReadTagsFromFile
+module Gramophone.Core.MediaController.ReadTags
     (
-      readTagsFromFile
+      readTags
     ) where
 
 import Gramophone.Core.MediaController.Types
+import Gramophone.Core.MediaController.Tags
 
-import Control.Applicative ((<$>),(<|>))
+import Control.Applicative ((<$>))
 import Control.Lens
 import Data.Text
 
@@ -34,24 +35,6 @@ import qualified Media.Streaming.GStreamer as GS
 import qualified System.Glib.Properties as G
 import qualified System.Glib.Signals as G
 import qualified System.Glib as G
-
-modifyTag l v = l `over` (<|> v)
-
-instance Show Tags where
-    show (Tags maybeTrackName maybeAlbumName maybeArtistName
-          maybeTrackNumber maybeNumTracks maybeDiscNumber
-          maybeNumDiscs) =
-                     (maybeLine "Title:       " maybeTrackName) ++ 
-                     (maybeLine "Artist:      " maybeArtistName) ++
-                     (maybeLine "Album:       " maybeAlbumName) ++
-                     (maybeLine "Track #:     " maybeTrackNumber) ++
-                     (maybeLine "Track Count: " maybeNumTracks) ++
-                     (maybeLine "Disc #:      " maybeDiscNumber) ++
-                     (maybeLine "Disc Count:  " maybeNumDiscs)
-                   where
-                     maybeLine label (Just value) =
-                       label ++ (show value) ++ "\n"
-                     maybeLine _     Nothing      = ""
 
 
 onNewPadConnectToSink :: GS.Element -> GS.Pad -> IO ()
@@ -81,9 +64,8 @@ onNewPadConnectToSink sink pad = do
     Nothing -> return ()
 
 
-readTagsFromFile :: MediaController ->
-                    ReadTagsCommand -> IO ReadTagsResult
-readTagsFromFile _ (ReadTags filePath) = do
+readTags :: MediaController -> ReadTagsCommand -> IO ReadTagsResult
+readTags _ (ReadTags filePath) = do
   let fileUri = "file://" ++ filePath
   pipe <- GS.pipelineNew fileUri
 
