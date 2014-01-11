@@ -25,63 +25,68 @@ module Gramophone.Core.MediaController
      playFile,
      stopPlaying,
      getStatus,
-
-     module Gramophone.Core.MediaController.ReadTagsFromFile
+     readTagsFromFile,
+     shutDown,
+     
+     Tags(Tags),
+     tagTrackName,
+     tagAlbumName,
+     tagArtistName,
+     tagTrackNumber,
+     tagNumTracks,
+     tagDiscNumber,
+     tagNumDiscs,
+     emptyTags,
+     ReadTagsResult(..)
     ) where
 
-import Gramophone.Core.MediaController.ReadTagsFromFile
+import Gramophone.Core.MediaController.Types
+import qualified Gramophone.Core.MediaController.ReadTagsFromFile as ReadTags
 import Gramophone.Core.MediaController.CommandMVar
 
-import Control.Concurrent (forkIO)
-import Control.Monad (liftM3)
+import Control.Concurrent (forkIO, yield)
+import Control.Monad (liftM5)
 import Control.Applicative ((<$>))
 import Data.Time.Clock (DiffTime, UTCTime(..), getCurrentTime)
 
-data Track = Track {
-    trackFilename    :: FilePath,
-    trackLength      :: DiffTime,
-    trackCurrentTime :: DiffTime
-  }
+import qualified Media.Streaming.GStreamer as GS
+import qualified System.Glib as G
+import qualified System.Glib.MainLoop as G
 
-
-data PlayerState = Playing Track | Stopped
-
-
---data Result = StatusMessage PlayerState UTCTime
---                            | PlayMessage PlayResult
-
-
---data Command = Play FilePath | Stop | GetStatus
-
-data GenericResult = Success | ErrorMessage String
-
-data PlayCommand = Play FilePath
-
-data StopCommand = Stop
-
-data StatusCommand = GetStatus
-data StatusResult = Status PlayerState UTCTime
-
-
-data MediaController = MediaController {
-  playCommand   :: CommandMVar PlayCommand   GenericResult,
-  stopCommand   :: CommandMVar StopCommand   GenericResult,
-  statusCommand :: CommandMVar StatusCommand StatusResult }
 
 initMediaController :: IO MediaController
 initMediaController = do
-  mc <- liftM3 MediaController initCommand initCommand initCommand
+  mc <- liftM5 MediaController
+                 initCommand initCommand initCommand
+                 initCommand initCommand
   forkIO $ mcThread mc 
   return mc
   
-mcThread = mcDispatch >> mcThread
+mcThread :: MediaController -> IO ()
+mcThread mcs = do
+  putStrLn "mcThread"
+  GS.init
+  loop <- G.mainLoopNew Nothing False
+  G.idleAdd (yield >> return True) G.priorityDefaultIdle
+  G.timeoutAdd (mcDispatch loop mcs >> return True ) 100
+  putStrLn "Entering main loop."
+  G.mainLoopRun loop
+  putStrLn "Exited main loop."
   
-mcDispatch :: MediaController -> IO ()
-mcDispatch mc = do
-  handleCommand' (playCommand mc) (playFile' mc)
-  handleCommand' (stopCommand mc) (stopPlaying' mc)
-  handleCommand' (statusCommand mc) (getStatus' mc)
-    
+mcDispatch :: G.MainLoop -> MediaController -> IO ()
+mcDispatch mainLoop mc = do
+  handleCommand (shutDownCommand mc) (shutDown' mainLoop mc)
+  handleCommand (playCommand mc) (playFile' mc)
+  handleCommand (stopCommand mc) (stopPlaying' mc)
+  handleCommand (statusCommand mc) (getStatus' mc)
+  handleCommand (readTagsCommand mc) (readTagsFromFile' mc)
+
+
+shutDown :: MediaController -> IO ()
+shutDown mc = (invokeCommand (shutDownCommand mc)) ShutDown
+
+shutDown' :: G.MainLoop -> MediaController -> ShutDownCommand -> IO ()
+shutDown' loop _ _  = putStrLn "shutDown'" >> G.mainLoopQuit loop
 
 playFile :: MediaController -> FilePath -> IO GenericResult
 playFile mc = (invokeCommand (playCommand mc)) . Play 
@@ -105,3 +110,10 @@ getStatus mc = (invokeCommand (statusCommand mc)) GetStatus
 getStatus' :: MediaController -> StatusCommand -> IO StatusResult
 getStatus' _ _ = (Status Stopped) <$> getCurrentTime
 
+readTagsFromFile :: MediaController ->
+                    FilePath -> IO ReadTagsResult
+readTagsFromFile mc = (invokeCommand (readTagsCommand mc)) . ReadTags
+
+readTagsFromFile' :: MediaController -> 
+                     ReadTagsCommand -> IO ReadTagsResult
+readTagsFromFile' = ReadTags.readTagsFromFile

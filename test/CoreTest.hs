@@ -21,8 +21,13 @@ import Test.Framework (defaultMain, Test)
 import qualified CoreTest.Database
 import qualified CoreTest.MediaController
 
-tests :: [Test]
-tests = [CoreTest.Database.tests, CoreTest.MediaController.tests]
+import Gramophone.Core.MediaController (initMediaController, shutDown)
+
+--tests :: [Test]
+--tests = [CoreTest.Database.tests, CoreTest.MediaController.tests]
 
 main :: IO ()
-main = defaultMain tests
+main = do
+  mc <- initMediaController
+  defaultMain [CoreTest.Database.tests, CoreTest.MediaController.tests mc]
+  shutDown mc

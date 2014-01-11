@@ -35,21 +35,23 @@ import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar,
 
 data CommandMVar c r = CommandMVar (MVar c) (MVar r)
 
+log' :: String -> (a -> IO b) -> a -> IO b
+log' m f a = do
+  putStrLn (m ++ " start")
+  r <- f a
+  putStrLn (m ++ " end")
+  return r
+
 initCommand :: IO (CommandMVar c r)
 initCommand = liftM2 CommandMVar newEmptyMVar newEmptyMVar
 
 invokeCommand :: CommandMVar c r -> c -> IO r
-invokeCommand (CommandMVar c r) = (takeMVar r <*) . putMVar c
-
---handleCommand' :: (CommandMVar c r) -> (c -> r) -> IO ()
---handleCommand' (CommandMVar c r) f = (f <$> takeMVar c) >>= (putMVar r)
+invokeCommand (CommandMVar c r) a =
+  putMVar c a >> putStr "." >> takeMVar r
 
 handleCommand' :: (CommandMVar c r) -> (c -> IO r) -> IO ()
---handleCommand' (CommandMVar c r) f = takeMVar c >>= f >>= putMVar r
-handleCommand' (CommandMVar c r) = (putMVar r =<<) . (takeMVar c >>=)
+handleCommand' (CommandMVar c r) f = takeMVar c >>= f >>= putMVar r
 
 handleCommand :: (CommandMVar c r) -> (c -> IO r) -> IO ()
---handleCommand (CommandMVar c r) f =
-  --tryTakeMVar c >>= mapM_ ((putMVar r =<<) . f)
-handleCommand (CommandMVar c r) =
-  (tryTakeMVar c >>=) . mapM_ . ((putMVar r =<<) .)
+handleCommand (CommandMVar c r) f =
+  tryTakeMVar c >>= mapM_ ((putMVar r =<<) . f)

@@ -35,12 +35,12 @@ import Gramophone.Core.MediaController
 
 import Paths_Gramophone
 
-tests :: Test
-tests = testGroup "Core.MediaController Tests" [
+tests :: MediaController -> Test
+tests mc = testGroup "Core.MediaController Tests" [
   testGroup "Tag Reading Tests" [
-     testCase "Read tags from FLAC" (testReadTags flacTestFile), 
-     testCase "Read tags from MP3" (testReadTags mp3TestFile),
-     testCase "Read tags from AAC" (testReadTags aacTestFile) ]]
+     testCase "Read tags from FLAC" (testReadTags mc flacTestFile), 
+     testCase "Read tags from MP3" (testReadTags mc mp3TestFile),
+     testCase "Read tags from AAC" (testReadTags mc aacTestFile) ]]
 
 data TestFile = TestFile FilePath Tags
 
@@ -65,14 +65,13 @@ aacTestFile = do
     (((set tagTrackName (Just "AAC Title")) {-. (set tagArtistName (Just "AAC Artist"))) -}
      . (set tagAlbumName (Just "AAC Album")) . (set tagTrackNumber (Just 16))) emptyTags)
 
-testReadTags :: IO TestFile -> Assertion
-testReadTags testFile = do
-    mc <- initTagReader
+testReadTags :: MediaController -> IO TestFile -> Assertion
+testReadTags mc testFile = do
     (TestFile name expectedTags) <- testFile
     maybeFoundTags <- readTagsFromFile mc name
     case maybeFoundTags of
-      Nothing -> assertFailure "Could not read file."
-      Just foundTags -> do
+      TagsFail msg -> assertFailure $ "Could not read file. (" ++ msg ++ ")"
+      TagsSuccess foundTags -> do
         assertTagsEqual [("Artist",view tagArtistName),("Track Name",view tagTrackName)] expectedTags foundTags
   where
     assertTagsEqual ((msg, field):rest) expected found = do
